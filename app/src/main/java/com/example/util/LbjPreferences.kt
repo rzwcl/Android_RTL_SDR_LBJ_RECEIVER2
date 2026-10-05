@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.util.Locale
 import androidx.core.content.edit
 import com.example.dsp.DspConstants
 
@@ -35,6 +36,8 @@ class LbjPreferences(context: Context) {
         private const val KEY_CONNECTION_MODE = "pref_connection_mode"
         private const val KEY_TCP_HOST = "pref_tcp_host"
         private const val KEY_TCP_PORT = "pref_tcp_port"
+        private const val KEY_IMPORTED_HISTORY_CSV_HASHES = "pref_imported_history_csv_hashes"
+        private const val MAX_IMPORTED_HISTORY_CSV_HASHES = 32
     }
 
     var connectionMode: String
@@ -48,6 +51,27 @@ class LbjPreferences(context: Context) {
     var tcpPort: Int
         get() = prefs.getInt(KEY_TCP_PORT, 1234).coerceIn(1, 65535)
         set(value) = prefs.edit { putInt(KEY_TCP_PORT, value.coerceIn(1, 65535)) }
+
+    fun hasImportedHistoryCsv(hash: String): Boolean {
+        val normalized = hash.trim().lowercase(Locale.ROOT)
+        if (normalized.isEmpty()) return false
+        val raw = prefs.getString(KEY_IMPORTED_HISTORY_CSV_HASHES, "") ?: ""
+        return raw.split("\n").any { it == normalized }
+    }
+
+    fun markHistoryCsvImported(hash: String) {
+        val normalized = hash.trim().lowercase(Locale.ROOT)
+        if (normalized.isEmpty()) return
+        val raw = prefs.getString(KEY_IMPORTED_HISTORY_CSV_HASHES, "") ?: ""
+        val hashes = raw.split("\n")
+            .map { it.trim().lowercase(Locale.ROOT) }
+            .filter { it.length == 64 }
+            .filter { it != normalized }
+            .takeLast(MAX_IMPORTED_HISTORY_CSV_HASHES - 1)
+            .toMutableList()
+        hashes += normalized
+        prefs.edit { putString(KEY_IMPORTED_HISTORY_CSV_HASHES, hashes.joinToString("\n")) }
+    }
 
     var hasPromptedDriverInstall: Boolean
         get() = prefs.getBoolean(KEY_HAS_PROMPTED_DRIVER_INSTALL, false)
