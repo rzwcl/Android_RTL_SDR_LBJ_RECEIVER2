@@ -65,6 +65,8 @@ import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.screens.LocomotiveLibraryScreen
+import com.example.util.LocomotiveLibrarySource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +91,50 @@ fun MainScreen(viewModel: LbjViewModel) {
                 Toast.makeText(
                     context,
                     "CSV 导出失败：" + (e.message ?: "未知错误"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    val importLocomotiveLibraryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val count = viewModel.importLocomotiveLibrary(uri)
+                Toast.makeText(
+                    context,
+                    "已导入 $count 项车型",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "车型库导入失败：" + (e.message ?: "未知错误"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    val exportLocomotiveLibraryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val count = viewModel.exportLocomotiveLibrary(uri)
+                Toast.makeText(
+                    context,
+                    "已导出 $count 项车型",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "车型库导出失败：" + (e.message ?: "未知错误"),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -126,9 +172,17 @@ fun MainScreen(viewModel: LbjViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var selectedHistoryRecordId by remember { mutableStateOf<Long?>(null) }
 
+    var showLocomotiveLibrary by remember { mutableStateOf(false) }
+
+    val locomotiveLibraryEntries by viewModel.locomotiveLibraryEntries.collectAsState()
+    val locomotiveLibrarySource by viewModel.locomotiveLibrarySource.collectAsState()
+
     LaunchedEffect(selectedTab) {
         if (selectedTab != 1) {
             selectedHistoryRecordId = null
+        }
+        if (selectedTab != 3) {
+            showLocomotiveLibrary = false
         }
     }
 
@@ -307,7 +361,38 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onImportRoutes = { routes -> viewModel.importRouteStationKms(routes) },
                 modifier = screenModifier
             )
-            3 -> SettingsScreen(
+            3 -> if (showLocomotiveLibrary) {
+                LocomotiveLibraryScreen(
+                    source = locomotiveLibrarySource,
+                    entries = locomotiveLibraryEntries,
+                    onBack = { showLocomotiveLibrary = false },
+                    onSelectSource = { viewModel.selectLocomotiveLibrary(it) },
+                    onAddOrEdit = { code, name ->
+                        try {
+                            viewModel.saveLocomotiveEntry(code, name)
+                            null
+                        } catch (e: Exception) {
+                            e.message ?: "保存车型失败"
+                        }
+                    },
+                    onDelete = { viewModel.deleteLocomotiveEntry(it) },
+                    onImport = {
+                        importLocomotiveLibraryLauncher.launch(
+                            arrayOf("text/plain", "text/*", "application/octet-stream")
+                        )
+                    },
+                    onExport = {
+                        exportLocomotiveLibraryLauncher.launch(
+                            if (locomotiveLibrarySource == LocomotiveLibrarySource.BUILTIN) {
+                                "LBJ-Builtin-Locomotive-Library.txt"
+                            } else {
+                                "LBJ-External-Locomotive-Library.txt"
+                            }
+                        )
+                    },
+                    modifier = screenModifier
+                )
+            } else SettingsScreen(
                 state = receiverState,
                 onOpenFreqDialog = { showFreqDialog = true },
                 onOpenGainDialog = { showGainDialog = true },
@@ -330,6 +415,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onSelectThemeMode = { viewModel.setThemeMode(it) },
                 onClearTtsCache = { viewModel.clearTtsCache() },
                 onToggleEnableExternalAutomation = { viewModel.setEnableExternalAutomation(it) },
+                onOpenLocomotiveLibrary = { showLocomotiveLibrary = true },
                 onResetAllSettings = { viewModel.resetAllSettings() },
                 onLaunchDriver = { viewModel.launchAndroidDriver() },
                 onInstallDriver = { viewModel.openDriverInstallGuide() },
