@@ -174,10 +174,15 @@ fun MainScreen(viewModel: LbjViewModel) {
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             try {
-                val count = viewModel.importHistoryCsv(uri)
+                val result = viewModel.importHistoryCsv(uri)
+                val message = if (result.alreadyImported) {
+                    "这份 CSV 已导入过，未重复添加记录"
+                } else {
+                    "已导入 " + result.importedCount + " 条 LBJ 信号记录"
+                }
                 Toast.makeText(
                     context,
-                    "已导入 " + count + " 条 LBJ 信号记录",
+                    message,
                     Toast.LENGTH_SHORT
                 ).show()
             } catch (e: Exception) {
