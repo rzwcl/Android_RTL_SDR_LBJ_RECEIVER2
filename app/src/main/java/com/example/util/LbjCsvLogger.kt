@@ -164,6 +164,7 @@ class LbjCsvLogger(context: Context) {
         if (value.none { ch -> ch == ',' || ch == '"' || ch == '\n' || ch == '\r' }) {
             return value
         }
-        return """ + value.replace(""", """") + """
+        val escaped = value.replace('"', "\"\"")
+        return "\"$escaped\""
     }
 }
