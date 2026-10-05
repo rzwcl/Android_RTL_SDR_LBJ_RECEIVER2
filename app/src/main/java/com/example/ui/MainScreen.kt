@@ -51,6 +51,7 @@ import com.example.ui.components.RouteStationKmDialog
 import com.example.ui.components.SignalLossDialog
 import com.example.ui.components.TrainTypeRuleDialog
 import com.example.ui.components.WatchlistDialog
+import com.example.ui.screens.DailyCsvScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.HistoryDetailScreen
 import com.example.ui.screens.HistoryScreen
@@ -142,6 +143,31 @@ fun MainScreen(viewModel: LbjViewModel) {
         }
     }
 
+    val dailyCsvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val fileName = pendingDailyCsvExportName
+        pendingDailyCsvExportName = null
+        if (uri != null && fileName != null) {
+            scope.launch {
+                try {
+                    viewModel.exportDailyCsvFile(fileName, uri)
+                    Toast.makeText(
+                        context,
+                        "已导出 " + fileName,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        context,
+                        "每日 CSV 导出失败：" + (e.message ?: "未知错误"),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
     val importHistoryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -174,6 +200,9 @@ fun MainScreen(viewModel: LbjViewModel) {
     var selectedHistoryRecordId by remember { mutableStateOf<Long?>(null) }
 
     var showLocomotiveLibrary by remember { mutableStateOf(false) }
+    var showDailyCsv by remember { mutableStateOf(false) }
+    var dailyCsvFiles by remember { mutableStateOf(viewModel.getDailyCsvFiles()) }
+    var pendingDailyCsvExportName by remember { mutableStateOf<String?>(null) }
 
     val locomotiveLibraryEntries by viewModel.locomotiveLibraryEntries.collectAsState()
     val locomotiveLibrarySource by viewModel.locomotiveLibrarySource.collectAsState()
@@ -184,6 +213,7 @@ fun MainScreen(viewModel: LbjViewModel) {
         }
         if (selectedTab != 3) {
             showLocomotiveLibrary = false
+            showDailyCsv = false
         }
     }
 
@@ -364,7 +394,18 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onImportRoutes = { routes -> viewModel.importRouteStationKms(routes) },
                 modifier = screenModifier
             )
-            3 -> if (showLocomotiveLibrary) {
+            3 -> if (showDailyCsv) {
+                DailyCsvScreen(
+                    files = dailyCsvFiles,
+                    onBack = { showDailyCsv = false },
+                    onRefresh = { dailyCsvFiles = viewModel.getDailyCsvFiles() },
+                    onExport = { fileName ->
+                        pendingDailyCsvExportName = fileName
+                        dailyCsvExportLauncher.launch(fileName)
+                    },
+                    modifier = screenModifier
+                )
+            } else if (showLocomotiveLibrary) {
                 LocomotiveLibraryScreen(
                     source = locomotiveLibrarySource,
                     entries = locomotiveLibraryEntries,
@@ -419,6 +460,10 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onClearTtsCache = { viewModel.clearTtsCache() },
                 onToggleEnableExternalAutomation = { viewModel.setEnableExternalAutomation(it) },
                 onOpenLocomotiveLibrary = { showLocomotiveLibrary = true },
+                onOpenDailyCsv = {
+                    dailyCsvFiles = viewModel.getDailyCsvFiles()
+                    showDailyCsv = true
+                },
                 onResetAllSettings = { viewModel.resetAllSettings() },
                 onLaunchDriver = { viewModel.launchAndroidDriver() },
                 onInstallDriver = { viewModel.openDriverInstallGuide() },
