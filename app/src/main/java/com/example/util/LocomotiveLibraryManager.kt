@@ -88,13 +88,25 @@ class LocomotiveLibraryManager(context: Context) {
         val result = LinkedHashMap<Int, String>()
         val normalized = text.removePrefix("﻿")
 
+        val entryPattern = Regex("""(?<!\\S)(\\d{1,3})\\s*=\\s*(.*?)(?=\\s+\\d{1,3}\\s*=|$)""")
         normalized.lineSequence().forEach { rawLine ->
             val line = rawLine.trim()
             if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) return@forEach
 
+            val matches = entryPattern.findAll(line).toList()
+            if (matches.isNotEmpty()) {
+                matches.forEach { match ->
+                    val code = match.groupValues[1].toIntOrNull()
+                    val name = match.groupValues[2].trim()
+                    if (code != null && code in 0..999 && name.isNotEmpty()) {
+                        result[code] = name
+                    }
+                }
+                return@forEach
+            }
+
             val pieces = when {
                 line.contains('	') -> line.split('	', limit = 2)
-                line.contains('=') -> line.split('=', limit = 2)
                 line.contains(',') -> line.split(',', limit = 2)
                 else -> emptyList()
             }
@@ -102,10 +114,7 @@ class LocomotiveLibraryManager(context: Context) {
 
             val code = pieces[0].trim().toIntOrNull()
             val name = pieces[1].trim()
-            if (code != null && code in 0..999 && name.isNotEmpty() &&
-                !pieces[0].trim().equals("代码", true) &&
-                !pieces[0].trim().equals("代号", true)
-            ) {
+            if (code != null && code in 0..999 && name.isNotEmpty()) {
                 result[code] = name
             }
         }
