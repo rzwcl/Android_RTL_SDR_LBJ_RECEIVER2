@@ -126,20 +126,6 @@ fun HistoryDetailScreen(
                 )
             }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "列车详情 · " + record.trainNo,
-                    color = PrimaryBlueDark,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "共 " + signals.size + " 条 LBJ 信号记录",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-
             Box {
                 var mapMenuExpanded by remember { mutableStateOf(false) }
 
@@ -157,7 +143,7 @@ fun HistoryDetailScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -195,6 +181,22 @@ fun HistoryDetailScreen(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.size(7.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "列车详情 · " + record.trainNo,
+                    color = PrimaryBlueDark,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "共 " + signals.size + " 条 LBJ 信号记录",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -210,7 +212,6 @@ fun HistoryDetailScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         val hasCoordinates = signals.any { hasSignalCoordinate(it) }
-        val hasRailwayMapData = railwayMapData?.hasFeatures == true
         if (hasCoordinates || hasRailwayMapData) {
             Card(
                 modifier = Modifier
@@ -331,7 +332,7 @@ private fun HistorySummaryCard(
                     modifier = Modifier
                         .background(dirBg, RoundedCornerShape(4.dp))
                         .border(0.5.dp, dirFg.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                         .padding(horizontal = 8.dp, vertical = 4.dp)
+                       .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(record.direction, color = dirFg, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -425,7 +426,8 @@ private fun DetailLine(
             text = value.ifBlank { "未知" },
             color = TextPrimary,
             fontSize = 13.sp,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
         )
     }
 }
