@@ -52,6 +52,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class ReceiverConnectionMode {
+    SDR,
+    TCP
+}
+
 data class PacketLogItem(
     val id: Long,
     val timestamp: Long,
@@ -61,6 +66,7 @@ data class PacketLogItem(
 )
 
 data class ReceiverState(
+    val connectionMode: ReceiverConnectionMode = ReceiverConnectionMode.SDR,
     val isRunning: Boolean = false,
     val isSimulationMode: Boolean = false,
     val connectionState: RtlTcpClient.ConnectionState = RtlTcpClient.ConnectionState.IDLE,
@@ -127,6 +133,13 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _receiverState = MutableStateFlow(
         ReceiverState(
+            connectionMode = if (prefs.connectionMode == "tcp") {
+                ReceiverConnectionMode.TCP
+            } else {
+                ReceiverConnectionMode.SDR
+            },
+            host = prefs.tcpHost,
+            port = prefs.tcpPort,
             freqHz = prefs.freqHz,
             gainDb = prefs.gainDb,
             ppm = prefs.ppm,
@@ -564,10 +577,13 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         if (!isSimulation) {
-            // Automatically attempt to drive/launch driver before connecting
-            try {
-                launchAndroidDriver()
-            } catch (_: Exception) {}
+            if (_receiverState.value.connectionMode == ReceiverConnectionMode.SDR) {
+                // SDR 模式：先联动启动手机 RTL-SDR 驱动，再连接本地 RTL-TCP 服务。
+                try {
+                    launchAndroidDriver()
+                } catch (_: Exception) {}
+            }
+            // TCP 模式：直接连接用户配置的远端 RTL-TCP 服务，不启动本机驱动。
             rtlClient.open()
         }
 
@@ -874,6 +890,49 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Tuning controls
+    fun setConnectionMode(mode: ReceiverConnectionMode) {
+        val current = _receiverState.value.connectionMode
+        if (current == mode) return
+
+        if (_receiverState.value.isRunning) {
+            stopReceiver()
+        } else {
+            rtlClient.close()
+        }
+
+        prefs.connectionMode = if (mode == ReceiverConnectionMode.TCP) "tcp" else "sdr"
+        _receiverState.value = _receiverState.value.copy(
+            connectionMode = mode,
+            host = prefs.tcpHost,
+            port = prefs.tcpPort,
+            connectionState = RtlTcpClient.ConnectionState.IDLE
+        )
+    }
+
+    fun setTcpEndpoint(host: String, port: Int): String? {
+        val normalizedHost = host.trim()
+        if (normalizedHost.isEmpty()) return "TCP 地址不能为空"
+        if (port !in 1..65535) return "TCP 端口必须在 1~65535"
+
+        if (_receiverState.value.isRunning) {
+            stopReceiver()
+        }
+
+        return try {
+            rtlClient.setEndpoint(normalizedHost, port)
+            prefs.tcpHost = normalizedHost
+            prefs.tcpPort = port
+            _receiverState.value = _receiverState.value.copy(
+                host = normalizedHost,
+                port = port,
+                connectionState = RtlTcpClient.ConnectionState.IDLE
+            )
+            null
+        } catch (e: Exception) {
+            e.message ?: "TCP 地址设置失败"
+        }
+    }
+
     fun setFrequency(freqMhz: Double) {
         val freqHz = freqMhz * 1_000_000.0
         prefs.freqHz = freqHz
@@ -1041,6 +1100,16 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetAllSettings() {
         prefs.resetAll()
+        prefs.connectionMode = "sdr"
+        prefs.tcpHost = "127.0.0.1"
+        prefs.tcpPort = 1234
+        rtlClient.setEndpoint("127.0.0.1", 1234)
+        _receiverState.value = _receiverState.value.copy(
+            connectionMode = ReceiverConnectionMode.SDR,
+            host = "127.0.0.1",
+            port = 1234,
+            connectionState = RtlTcpClient.ConnectionState.IDLE
+        )
         setFrequency(DspConstants.DEFAULT_FREQ_HZ / 1_000_000.0)
         setGain(DspConstants.HW_GAIN_DB)
         setPpm(DspConstants.PPM)
@@ -1305,6 +1374,13 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun launchAndroidDriver() {
+        if (_receiverState.value.connectionMode != ReceiverConnectionMode.SDR) {
+            _receiverState.value = _receiverState.value.copy(
+                warningMessage = "当前为 TCP 连接模式，不启动本机 RTL-SDR 驱动。"
+            )
+            return
+        }
+
         val state = _receiverState.value
         val ok = DriverLauncher.startRtlDriver(
             context = getApplication(),
