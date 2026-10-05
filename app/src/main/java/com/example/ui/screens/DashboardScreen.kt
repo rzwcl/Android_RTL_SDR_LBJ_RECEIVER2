@@ -45,16 +45,19 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.example.ui.PacketLogItem
+import com.example.ui.ReceiverConnectionMode
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -97,6 +100,8 @@ fun DashboardScreen(
     etaInfo: EtaInfo,
     onStartReceiver: (Boolean) -> Unit,
     onStopReceiver: () -> Unit,
+    onSetConnectionMode: (ReceiverConnectionMode) -> Unit = {},
+    onSetTcpEndpoint: (String, Int) -> String? = { _, _ -> null },
     onLaunchDriver: () -> Unit,
     onClearTelemetry: () -> Unit,
     onOpenFreqDialog: () -> Unit,
@@ -115,6 +120,17 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    var tcpHostText by remember(state.host) { mutableStateOf(state.host) }
+    var tcpPortText by remember(state.port) { mutableStateOf(state.port.toString()) }
+    var tcpEndpointError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.host, state.port, state.connectionMode) {
+        if (state.connectionMode == ReceiverConnectionMode.TCP) {
+            tcpHostText = state.host
+            tcpPortText = state.port.toString()
+            tcpEndpointError = null
+        }
+    }
 
     Column(
         modifier = modifier
@@ -131,6 +147,108 @@ fun DashboardScreen(
                 .padding(16.dp)
         ) {
             Column {
+                // Connection mode selector
+                Text(
+                    text = "连接方式",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            tcpEndpointError = null
+                            onSetConnectionMode(ReceiverConnectionMode.SDR)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("connection_mode_sdr")
+                    ) {
+                        Text(
+                            text = if (state.connectionMode == ReceiverConnectionMode.SDR) {
+                                "✓ SDR连接"
+                            } else {
+                                "SDR连接"
+                            },
+                            fontSize = 12.sp
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            tcpEndpointError = null
+                            onSetConnectionMode(ReceiverConnectionMode.TCP)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("connection_mode_tcp")
+                    ) {
+                        Text(
+                            text = if (state.connectionMode == ReceiverConnectionMode.TCP) {
+                                "✓ TCP连接"
+                            } else {
+                                "TCP连接"
+                            },
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                if (state.connectionMode == ReceiverConnectionMode.TCP) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = tcpHostText,
+                            onValueChange = {
+                                tcpHostText = it
+                                tcpEndpointError = null
+                            },
+                            label = { Text("IP / 主机") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.7f)
+                        )
+                        OutlinedTextField(
+                            value = tcpPortText,
+                            onValueChange = {
+                                tcpPortText = it.filter(Char::isDigit).take(5)
+                                tcpEndpointError = null
+                            },
+                            label = { Text("端口") },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.75f)
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                val port = tcpPortText.toIntOrNull()
+                                tcpEndpointError = if (port == null) {
+                                    "请输入有效端口"
+                                } else {
+                                    onSetTcpEndpoint(tcpHostText, port)
+                                }
+                            }
+                        ) {
+                            Text("应用", fontSize = 12.sp)
+                        }
+                    }
+                    tcpEndpointError?.let {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = it,
+                            color = RedAlert,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // Row 1: Status Pill Indicator & Dynamic Current Freq
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -139,10 +257,20 @@ fun DashboardScreen(
                 ) {
                     val (statusBg, statusFg, statusText) = when {
                         state.isSimulationMode && state.isRunning -> Triple(AmberSoft, AmberSignal, "仿真信号流运行中")
+                        state.isRunning && state.connectionMode == ReceiverConnectionMode.TCP ->
+                            Triple(EmeraldSoft, EmeraldGreen, "TCP 实时接收中")
                         state.isRunning -> Triple(EmeraldSoft, EmeraldGreen, "SDR 实时接收中")
-                        state.connectionState == RtlTcpClient.ConnectionState.CONNECTING -> Triple(PrimaryBlueSoft, PrimaryBlueDark, "正在连接驱动...")
-                        state.connectionState == RtlTcpClient.ConnectionState.ERROR -> Triple(RedSoft, RedAlert, "驱动未连接")
-                        else -> Triple(SurfaceSecondary, TextMuted, "待驱动接收器")
+                        state.connectionState == RtlTcpClient.ConnectionState.CONNECTING &&
+                            state.connectionMode == ReceiverConnectionMode.TCP ->
+                            Triple(PrimaryBlueSoft, PrimaryBlueDark, "正在连接 TCP...")
+                        state.connectionState == RtlTcpClient.ConnectionState.CONNECTING ->
+                            Triple(PrimaryBlueSoft, PrimaryBlueDark, "正在连接驱动...")
+                        state.connectionState == RtlTcpClient.ConnectionState.ERROR &&
+                            state.connectionMode == ReceiverConnectionMode.TCP ->
+                            Triple(RedSoft, RedAlert, "TCP 未连接")
+                        state.connectionState == RtlTcpClient.ConnectionState.ERROR ->
+                            Triple(RedSoft, RedAlert, "驱动未连接")
+                        else -> Triple(SurfaceSecondary, TextMuted, "待接收器")
                     }
 
                     Box(
@@ -265,38 +393,43 @@ fun DashboardScreen(
                         }
                     }
 
-                    // 尝试重新驱动设备 (原联动驱动)
-                    OutlinedButton(
-                        onClick = onLaunchDriver,
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .weight(if (state.showSimulationButton) 1.35f else 1.5f)
-                            .height(40.dp)
-                            .testTag("launch_driver_button")
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Usb,
-                                contentDescription = "Driver",
-                                tint = PrimaryBlue,
-                                modifier = Modifier
-                                    .size(15.dp)
-                                    .padding(end = 3.dp)
-                            )
-                            Text(
-                                text = "尝试重新驱动设备",
-                                color = PrimaryBlueDark,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
+                    // SDR 模式下提供本机 RTL-SDR 驱动联动；TCP 模式不启动本机驱动。
+                    if (state.connectionMode == ReceiverConnectionMode.SDR) {
+                                            // 尝试重新驱动设备 (原联动驱动)
+                                            OutlinedButton(
+                                                onClick = onLaunchDriver,
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                                modifier = Modifier
+                                                    .weight(if (state.showSimulationButton) 1.35f else 1.5f)
+                                                    .height(40.dp)
+                                                    .testTag("launch_driver_button")
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Usb,
+                                                        contentDescription = "Driver",
+                                                        tint = PrimaryBlue,
+                                                        modifier = Modifier
+                                                            .size(15.dp)
+                                                            .padding(end = 3.dp)
+                                                    )
+                                                    Text(
+                                                        text = "尝试重新驱动设备",
+                                                        color = PrimaryBlueDark,
+                                                        fontSize = 11.5.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        maxLines = 1,
+                                                        softWrap = false
+                                                    )
+                                                }
+                                            }
+                        
+                        
                     }
 
                     // 清屏
