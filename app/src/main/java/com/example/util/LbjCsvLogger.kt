@@ -92,6 +92,34 @@ class LbjCsvLogger(context: Context) {
 
     fun getDirectory(): File = rootDirectory
 
+    data class DailyFileInfo(
+        val name: String,
+        val sizeBytes: Long
+    )
+
+    fun listDailyFiles(): List<DailyFileInfo> {
+        return rootDirectory.listFiles()
+            ?.asSequence()
+            ?.filter { it.isFile && it.extension.equals("csv", ignoreCase = true) }
+            ?.sortedByDescending { it.name }
+            ?.map { DailyFileInfo(it.name, it.length()) }
+            ?.toList()
+            ?: emptyList()
+    }
+
+    fun getDailyFile(name: String): File? {
+        val file = File(rootDirectory, name)
+        return if (
+            file.isFile &&
+            file.extension.equals("csv", ignoreCase = true) &&
+            file.parentFile?.canonicalFile == rootDirectory.canonicalFile
+        ) {
+            file
+        } else {
+            null
+        }
+    }
+
     private fun splitLocomotive(value: String): Pair<String, String> {
         if (value.isBlank() || value == "----") {
             return "****" to "****"
