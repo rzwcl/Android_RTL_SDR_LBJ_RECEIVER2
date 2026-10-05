@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -58,6 +59,7 @@ import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.PacketLogScreen
 import com.example.ui.screens.RoutesScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.TrainInfoScreen
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.BorderLight
 import com.example.ui.theme.PrimaryBlue
@@ -217,13 +219,13 @@ fun MainScreen(viewModel: LbjViewModel) {
         if (selectedTab != 1) {
             selectedHistoryRecordId = null
         }
-        if (selectedTab != 3) {
+        if (selectedTab != 4) {
             showLocomotiveLibrary = false
             showDailyCsv = false
         }
     }
 
-    if (!receiverState.showPacketLogTab && selectedTab == 4) {
+    if (!receiverState.showPacketLogTab && selectedTab == 5) {
         selectedTab = 0
     }
 
@@ -282,36 +284,45 @@ fun MainScreen(viewModel: LbjViewModel) {
                 NavigationBarItem(
                     selected = (selectedTab == 1),
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.History, contentDescription = "历史记录") },
-                    label = { Text("历史", fontSize = 11.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                    icon = { Icon(Icons.Default.Train, contentDescription = "列车信息") },
+                    label = { Text("列车信息", fontSize = 11.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
                     colors = navItemColors,
-                    modifier = Modifier.testTag("tab_history")
+                    modifier = Modifier.testTag("tab_train_info")
                 )
 
                 NavigationBarItem(
                     selected = (selectedTab == 2),
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.AutoMirrored.Filled.AltRoute, contentDescription = "位置设置") },
-                    label = { Text("位置设置", fontSize = 11.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                    icon = { Icon(Icons.Default.History, contentDescription = "历史记录") },
+                    label = { Text("历史", fontSize = 11.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
                     colors = navItemColors,
-                    modifier = Modifier.testTag("tab_routes")
+                    modifier = Modifier.testTag("tab_history")
                 )
 
                 NavigationBarItem(
                     selected = (selectedTab == 3),
                     onClick = { selectedTab = 3 },
+                    icon = { Icon(Icons.AutoMirrored.Filled.AltRoute, contentDescription = "位置设置") },
+                    label = { Text("位置设置", fontSize = 11.sp, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                    colors = navItemColors,
+                    modifier = Modifier.testTag("tab_routes")
+                )
+
+                NavigationBarItem(
+                    selected = (selectedTab == 4),
+                    onClick = { selectedTab = 4 },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "设置") },
-                    label = { Text("设置", fontSize = 11.sp, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                    label = { Text("设置", fontSize = 11.sp, fontWeight = if (selectedTab == 4) FontWeight.Bold else FontWeight.Normal) },
                     colors = navItemColors,
                     modifier = Modifier.testTag("tab_settings")
                 )
 
                 if (receiverState.showPacketLogTab) {
                     NavigationBarItem(
-                        selected = (selectedTab == 4),
-                        onClick = { selectedTab = 4 },
+                        selected = (selectedTab == 5),
+                        onClick = { selectedTab = 5 },
                         icon = { Icon(Icons.Default.Terminal, contentDescription = "报文日志") },
-                        label = { Text("报文日志", fontSize = 11.sp, fontWeight = if (selectedTab == 4) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text("报文日志", fontSize = 11.sp, fontWeight = if (selectedTab == 5) FontWeight.Bold else FontWeight.Normal) },
                         colors = navItemColors,
                         modifier = Modifier.testTag("tab_packet_logs")
                     )
@@ -327,8 +338,6 @@ fun MainScreen(viewModel: LbjViewModel) {
         when (selectedTab) {
             0 -> DashboardScreen(
                 state = receiverState,
-                telemetry = liveTelemetry,
-                etaInfo = liveEta,
                 onStartReceiver = { isSim -> viewModel.startReceiver(isSim) },
                 onStopReceiver = { viewModel.stopReceiver() },
                 onSetConnectionMode = { viewModel.setConnectionMode(it) },
@@ -342,7 +351,6 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onOpenCsDialog = { showCsDialog = true },
                 onOpenWatchlistDialog = { showWatchlistDialog = true },
                 onOpenFftExplanationDialog = { showFftExplanationDialog = true },
-                onOpenTrainTypeRuleDialog = { showTrainTypeRuleDialog = true },
                 onToggleAlertTone = { viewModel.setAlertToneEnabled(it) },
                 onToggleAlertNotification = { viewModel.setAlertNotificationEnabled(it) },
                 onToggleBasebandAudio = { viewModel.setBasebandAudioEnabled(it) },
@@ -351,7 +359,14 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onNavigateToPacketLogs = { selectedTab = 4 },
                 modifier = screenModifier
             )
-            1 -> {
+            1 -> TrainInfoScreen(
+                telemetry = liveTelemetry,
+                etaInfo = liveEta,
+                currentStationKmText = receiverState.currentRouteStationKmText,
+                onOpenTrainTypeRuleDialog = { showTrainTypeRuleDialog = true },
+                modifier = screenModifier
+            )
+            2 -> {
                 val selectedRecord = selectedHistoryRecordId?.let { id ->
                     historyRecords.firstOrNull { it.id == id }
                 }
@@ -389,7 +404,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                     )
                 }
             }
-            2 -> RoutesScreen(
+            3 -> RoutesScreen(
                 savedRoutes = savedRoutes,
                 onAddOrEditRoute = { route, km, nickname ->
                     editingRouteName = route
@@ -401,7 +416,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onImportRoutes = { routes -> viewModel.importRouteStationKms(routes) },
                 modifier = screenModifier
             )
-            3 -> if (showDailyCsv) {
+            4 -> if (showDailyCsv) {
                 DailyCsvScreen(
                     files = dailyCsvFiles,
                     onBack = { showDailyCsv = false },
@@ -477,7 +492,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onTestVoiceBroadcast = { viewModel.testVoiceBroadcast() },
                 modifier = screenModifier
             )
-            4 -> PacketLogScreen(
+            5 -> PacketLogScreen(
                 packetLogs = packetLogs,
                 onClearLogs = { viewModel.clearPacketLogs() }
             )
