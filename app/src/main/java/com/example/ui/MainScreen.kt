@@ -216,7 +216,7 @@ fun MainScreen(viewModel: LbjViewModel) {
     val locomotiveLibrarySource by viewModel.locomotiveLibrarySource.collectAsState()
 
     LaunchedEffect(selectedTab) {
-        if (selectedTab != 1) {
+        if (selectedTab != 2) {
             selectedHistoryRecordId = null
         }
         if (selectedTab != 4) {
@@ -356,7 +356,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onToggleBasebandAudio = { viewModel.setBasebandAudioEnabled(it) },
                 onDismissWarning = { viewModel.clearWarning() },
                 packetLogs = packetLogs,
-                onNavigateToPacketLogs = { selectedTab = 4 },
+                onNavigateToPacketLogs = { selectedTab = 5 },
                 modifier = screenModifier
             )
             1 -> TrainInfoScreen(
