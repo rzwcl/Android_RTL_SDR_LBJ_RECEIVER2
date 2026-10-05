@@ -61,8 +61,8 @@ class RtlTcpClient(
         private set
 
     private val isRunning = AtomicBoolean(false)
-    private var socket: Socket? = null
-    private var outputStream: OutputStream? = null
+    @Volatile private var socket: Socket? = null
+    @Volatile private var outputStream: OutputStream? = null
     private var workerThread: Thread? = null
     private val bufferPool = ArrayBlockingQueue<ComplexBuffer>(24).apply {
         repeat(24) { offer(ComplexBuffer(blockSize)) }
