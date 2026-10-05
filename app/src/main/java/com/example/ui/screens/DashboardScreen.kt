@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -62,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -102,6 +104,8 @@ fun DashboardScreen(
     onClearTelemetry: () -> Unit,
     onOpenFreqDialog: () -> Unit,
     onOpenGainDialog: () -> Unit,
+    onToggleTunerAgc: (Boolean) -> Unit,
+    onToggleRtlAgc: (Boolean) -> Unit,
     onOpenPpmDialog: () -> Unit,
     onOpenCsDialog: () -> Unit,
     onOpenWatchlistDialog: () -> Unit,
@@ -115,6 +119,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
     var tcpHostText by remember(state.host) { mutableStateOf(state.host) }
     var tcpPortText by remember(state.port) { mutableStateOf(state.port.toString()) }
     var tcpEndpointError by remember { mutableStateOf<String?>(null) }
@@ -777,7 +782,17 @@ fun DashboardScreen(
                     .weight(1f)
                     .background(SurfaceCard, RoundedCornerShape(8.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(8.dp))
-                    .clickable { onOpenGainDialog() }
+                    .clickable {
+                        if (state.tunerAgc) {
+                            Toast.makeText(
+                                context,
+                                "Tuner AGC 已开启，正在自动控制硬件增益；请先关闭 Tuner AGC 再手动设置增益",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            onOpenGainDialog()
+                        }
+                    }
                     .padding(8.dp)
             ) {
                 Column {
@@ -855,6 +870,158 @@ fun DashboardScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Text(
+            text = "射频自动增益",
+            color = TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, BorderLight, RoundedCornerShape(12.dp))
+                .testTag("dashboard_agc_card"),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 4.dp)
+                    ) {
+                        Text(
+                            text = "Tuner AGC",
+                            color = if (state.tunerAgc) PrimaryBlueDark else TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "自动控制 R820T 模拟前端增益",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp,
+                            lineHeight = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (state.tunerAgc) "开启：手动增益已锁定" else "关闭：可手动调整硬件增益",
+                            color = if (state.tunerAgc) PrimaryBlueDark else TextMuted,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Switch(
+                        checked = state.tunerAgc,
+                        onCheckedChange = onToggleTunerAgc,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PrimaryBlue,
+                            uncheckedTrackColor = SurfaceSecondary
+                        )
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(64.dp)
+                            .background(BorderLight)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 4.dp)
+                    ) {
+                        Text(
+                            text = "RTL AGC",
+                            color = if (state.rtlAgc) PrimaryBlueDark else TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "自动控制 RTL2832U 数字端 AGC",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp,
+                            lineHeight = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (state.rtlAgc) "开启：数字端自动增益" else "关闭：使用固定数字增益",
+                            color = if (state.rtlAgc) PrimaryBlueDark else TextMuted,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Switch(
+                        checked = state.rtlAgc,
+                        onCheckedChange = onToggleRtlAgc,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PrimaryBlue,
+                            uncheckedTrackColor = SurfaceSecondary
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceSecondary, RoundedCornerShape(8.dp))
+                        .clickable {
+                            if (state.tunerAgc) {
+                                Toast.makeText(
+                                    context,
+                                    "Tuner AGC 已开启，当前由调谐器自动控制硬件增益",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                onOpenGainDialog()
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "手动硬件增益",
+                            color = if (state.tunerAgc) TextMuted else TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (state.tunerAgc) "Tuner AGC 开启后不可手动修改" else "点击设置 R820T Gain",
+                            color = TextMuted,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                    Text(
+                        text = if (state.tunerAgc) "自动" else String.format(Locale.US, "%.1f dB", state.gainDb),
+                        color = if (state.tunerAgc) TextMuted else PrimaryBlueDark,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (state.showPacketLogTab) {
             Spacer(modifier = Modifier.height(16.dp))
