@@ -30,7 +30,9 @@ import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.infowindow.InfoWindow
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
@@ -377,7 +379,7 @@ private fun renderHistoryTrack(
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
-    mapView.closeInfoWindow()
+    InfoWindow.closeAllInfoWindowsOn(mapView)
     mapView.setTileSource(
         if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource
     )
@@ -453,8 +455,7 @@ private fun renderHistoryTrack(
             position = markerPoint.geoPoint
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = createTrainMarkerDrawable(mapView)
-            title = markerPoint.signal.trainNo + " · " + markerPoint.signal.positionKm
-            snippet = buildMarkerSnippet(markerPoint.signal)
+            setInfoWindow(null)
         }
         mapView.overlays.add(marker)
     }
