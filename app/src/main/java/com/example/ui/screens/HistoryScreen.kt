@@ -72,6 +72,8 @@ fun HistoryScreen(
     onClearAll: () -> Unit,
     onDeleteRecord: (Long) -> Unit,
     onOpenRecord: (TrainRecord) -> Unit = {},
+    onImportCsv: () -> Unit = {},
+    onExportCsv: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showClearDialog by remember { mutableStateOf(false) }
@@ -125,6 +127,26 @@ fun HistoryScreen(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onImportCsv,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("导入 CSV", fontSize = 12.sp)
+            }
+
+            OutlinedButton(
+                onClick = onExportCsv,
+                enabled = records.isNotEmpty(),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("导出 CSV", fontSize = 12.sp)
             }
         }
 
