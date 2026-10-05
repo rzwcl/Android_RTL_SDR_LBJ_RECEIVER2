@@ -41,7 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -213,6 +212,7 @@ fun HistoryScreen(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
+                        .offset(x = 8.dp)
                 )
             }
         }
@@ -249,7 +249,6 @@ private fun HistoryScrollbar(
     listState: androidx.compose.foundation.lazy.LazyListState,
     modifier: Modifier = Modifier
 ) {
-    val scrollScope = rememberCoroutineScope()
     val layoutInfo = listState.layoutInfo
     val totalItems = layoutInfo.totalItemsCount
     val visibleItems = layoutInfo.visibleItemsInfo.size
@@ -259,58 +258,82 @@ private fun HistoryScrollbar(
     var trackHeightPx by remember { mutableStateOf(0) }
     val viewportHeightPx =
         (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).coerceAtLeast(1)
-    val minThumbPx = 44
+    val minThumbPx = 64
     val rawThumbPx = (viewportHeightPx.toFloat() * visibleItems / totalItems).roundToInt()
     val thumbHeightPx = rawThumbPx.coerceIn(minThumbPx, viewportHeightPx)
     val maxTravelPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(0)
+
     val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()
     val averageItemHeightPx = if (visibleItems > 0) {
         viewportHeightPx.toFloat() / visibleItems
     } else {
         1f
     }
+    val maxFirstPosition = (totalItems - visibleItems).coerceAtLeast(1)
     val firstPosition = (firstVisible?.index ?: 0) +
         ((firstVisible?.offset ?: 0) / averageItemHeightPx)
-    val maxFirstPosition = (totalItems - visibleItems).coerceAtLeast(1)
     val progress = (firstPosition / maxFirstPosition).coerceIn(0f, 1f)
     val thumbTopPx = (maxTravelPx * progress).roundToInt()
 
     Box(
         modifier = modifier
-            .padding(end = 2.dp)
-            .width(16.dp)
+            .width(28.dp)
             .onSizeChanged { trackHeightPx = it.height }
             .pointerInput(totalItems, visibleItems, trackHeightPx, thumbHeightPx) {
+                var dragStartTopPx = thumbTopPx.toFloat()
+                var accumulatedDragPx = 0f
+
                 detectDragGestures(
+                    onDragStart = {
+                        dragStartTopPx = thumbTopPx.toFloat()
+                        accumulatedDragPx = 0f
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         if (maxTravelPx <= 0) return@detectDragGestures
-                        val currentTop = thumbTopPx
-                        val nextTop = (currentTop + dragAmount.y)
+
+                        accumulatedDragPx += dragAmount.y
+                        val nextTopPx = (dragStartTopPx + accumulatedDragPx)
                             .coerceIn(0f, maxTravelPx.toFloat())
-                        val targetIndex = (
-                            nextTop / maxTravelPx * maxFirstPosition
-                        ).roundToInt().coerceIn(0, maxFirstPosition)
-                        scrollScope.launch { listState.scrollToItem(targetIndex) }
+
+                        val targetProgress = (nextTopPx / maxTravelPx).coerceIn(0f, 1f)
+                        val targetIndex = (targetProgress * maxFirstPosition)
+                            .roundToInt()
+                            .coerceIn(0, maxFirstPosition)
+
+                        listState.scrollToItem(targetIndex)
                     }
                 )
-            }
+            },
+        contentAlignment = Alignment.CenterEnd
     ) {
-        androidx.compose.foundation.layout.Box(
+        Box(
             modifier = Modifier
                 .width(4.dp)
-                .height(with(androidx.compose.ui.platform.LocalDensity.current) {
-                    thumbHeightPx.toDp()
-                })
-                .offset(
-                    y = with(androidx.compose.ui.platform.LocalDensity.current) {
-                        thumbTopPx.toDp()
+                .fillMaxHeight()
+                .align(Alignment.CenterEnd)
+                .background(
+                    BorderLight.copy(alpha = 0.65f),
+                    RoundedCornerShape(4.dp)
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .width(10.dp)
+                .height(
+                    with(androidx.compose.ui.platform.LocalDensity.current) {
+                        thumbHeightPx.toDp()
                     }
                 )
-                .align(Alignment.TopCenter)
+                .offset(
+                    x = with(androidx.compose.ui.platform.LocalDensity.current) { 2.dp },
+                    y = with(androidx.compose.ui.platform.LocalDensity.current) { thumbTopPx.toDp() }
+                )
+                .align(Alignment.TopEnd)
                 .background(
-                    TextMuted.copy(alpha = 0.65f),
-                    RoundedCornerShape(4.dp)
+                    TextMuted.copy(alpha = 0.82f),
+                    RoundedCornerShape(6.dp)
                 )
         )
     }
