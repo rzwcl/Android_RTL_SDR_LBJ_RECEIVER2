@@ -285,24 +285,6 @@ fun MainScreen(viewModel: LbjViewModel) {
     var editingRouteNickname by remember { mutableStateOf("") }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = androidx.compose.ui.Alignment.Center
-                    ) {
-                        Text(
-                            text = "SDR-LBJ",
-                            color = TextPrimary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCard)
-            )
-        },
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState)
         },
