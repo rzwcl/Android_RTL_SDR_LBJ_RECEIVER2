@@ -679,7 +679,6 @@ class LbjDecoder(
             val expired = sessions.filter { now - ((it.value["timestamp"] as? Long) ?: 0L) > 120000 }.keys
             for (k in expired) {
                 sessions.remove(k)
-                directionCache.remove(k)
                 if (lastTrain == k) {
                     lastTrain = null
                 }
@@ -691,7 +690,6 @@ class LbjDecoder(
         val expired = sessions.filter { now - ((it.value["timestamp"] as? Long) ?: 0L) > 120000 }.keys
         for (k in expired) {
             sessions.remove(k)
-            directionCache.remove(k)
             if (lastTrain == k) {
                 lastTrain = null
             }
