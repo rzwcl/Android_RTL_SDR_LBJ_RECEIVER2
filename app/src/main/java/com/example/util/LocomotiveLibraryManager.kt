@@ -86,41 +86,61 @@ class LocomotiveLibraryManager(context: Context) {
      */
     fun importText(text: String): Int {
         val result = LinkedHashMap<Int, String>()
-        val normalized = text.removePrefix("﻿")
+        val normalized = text
+            .removePrefix("\uFEFF")
+            .replace('＝', '=')
+            .replace('：', ':')
 
-        val entryPattern = Regex("""(?<!\S)(\d{1,3})\s*=\s*(.*?)(?=\s+\d{1,3}\s*=|$)""")
+        // 主要格式：100=解放    101=DF    102=DF2
+        // 同一行可以连续写多项；空格/Tab 分隔；也兼容“代码:车型”。
+        val entryPattern = Regex(
+            """(?<!\d)(\d{1,3})\s*[=:]\s*([^\r\n]*?)(?=\s+\d{1,3}\s*[=:]\s*|$)"""
+        )
+
         normalized.lineSequence().forEach { rawLine ->
             val line = rawLine.trim()
-            if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) return@forEach
+            if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) {
+                return@forEach
+            }
 
             val matches = entryPattern.findAll(line).toList()
-            if (matches.isNotEmpty()) {
-                matches.forEach { match ->
-                    val code = match.groupValues[1].toIntOrNull()
-                    val name = match.groupValues[2].trim()
+            matches.forEach { match ->
+                val code = match.groupValues[1].toIntOrNull()
+                val name = match.groupValues[2]
+                    .trim()
+                    .trimEnd(';', ',', '|')
+                    .trim()
+
+                if (code != null && code in 0..999 && name.isNotEmpty()) {
+                    result[code] = name
+                }
+            }
+
+            // 兜底：单独一行的“100 解放 / 100<TAB>解放 / 100,解放”
+            if (matches.isEmpty()) {
+                val pieces = when {
+                    line.contains('\t') -> line.split('\t', limit = 2)
+                    line.contains(',') -> line.split(',', limit = 2)
+                    else -> {
+                        val m = Regex("""^(\d{1,3})\s+(.+)$""").matchEntire(line)
+                        if (m != null) listOf(m.groupValues[1], m.groupValues[2]) else emptyList()
+                    }
+                }
+
+                if (pieces.size == 2) {
+                    val code = pieces[0].trim().toIntOrNull()
+                    val name = pieces[1].trim()
                     if (code != null && code in 0..999 && name.isNotEmpty()) {
                         result[code] = name
                     }
                 }
-                return@forEach
-            }
-
-            val pieces = when {
-                line.contains('	') -> line.split('	', limit = 2)
-                line.contains(',') -> line.split(',', limit = 2)
-                else -> emptyList()
-            }
-            if (pieces.size != 2) return@forEach
-
-            val code = pieces[0].trim().toIntOrNull()
-            val name = pieces[1].trim()
-            if (code != null && code in 0..999 && name.isNotEmpty()) {
-                result[code] = name
             }
         }
 
         if (result.isEmpty()) {
-            throw IllegalArgumentException("TXT 中没有找到有效的“代号 + 车型”记录")
+            throw IllegalArgumentException(
+                "TXT 中没有找到有效的“代号 + 车型”记录。请检查是否使用“100=解放”这类格式。"
+            )
         }
 
         val source = getSource()
