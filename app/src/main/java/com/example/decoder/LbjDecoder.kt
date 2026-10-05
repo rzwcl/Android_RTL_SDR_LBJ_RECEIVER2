@@ -366,6 +366,8 @@ class LbjDecoder(
                     "route" to "----",
                     "route_valid" to false,
                     "is_detailed" to false,
+                    "longitude" to "",
+                    "latitude" to "",
                     "timestamp" to now
                 )
             }
@@ -482,6 +484,35 @@ class LbjDecoder(
                             session["route"] = ru
                             session["route_valid"] = true
                         }
+
+                        // LBJ 1234002 coordinates:
+                        // longitude nibbles 30..38 -> XXX°XX.XXXX′E
+                        // latitude  nibbles 39..46 -> XX°XX.XXXX′N
+                        if (ih.length >= 47) {
+                            val lonPart = ih.substring(30, 39)
+                            val latPart = ih.substring(39, 47)
+                            if (lonPart.all { it.isDigit() } && latPart.all { it.isDigit() }) {
+                                val lonDeg = lonPart.substring(0, 3)
+                                val lonMin = "${lonPart.substring(3, 5)}.${lonPart.substring(5, 9)}"
+                                val latDeg = latPart.substring(0, 2)
+                                val latMin = "${latPart.substring(2, 4)}.${latPart.substring(4, 8)}"
+
+                                val lonDegValue = lonDeg.toIntOrNull()
+                                val lonMinValue = lonMin.toDoubleOrNull()
+                                val latDegValue = latDeg.toIntOrNull()
+                                val latMinValue = latMin.toDoubleOrNull()
+
+                                if (lonDegValue != null && lonMinValue != null &&
+                                    latDegValue != null && latMinValue != null &&
+                                    lonDegValue in 0..180 && lonMinValue in 0.0..<60.0 &&
+                                    latDegValue in 0..90 && latMinValue in 0.0..<60.0
+                                ) {
+                                    session["longitude"] = "${lonDeg}°${lonMin}′E"
+                                    session["latitude"] = "${latDeg}°${latMin}′N"
+                                }
+                            }
+                        }
+
                         session["is_detailed"] = true
                         session["timestamp"] = now
                     }
@@ -513,6 +544,8 @@ class LbjDecoder(
             val loco = (s["loco"] as? String) ?: "----"
             val locoCode = (s["loco_code"] as? String) ?: "---"
             val route = (s["route"] as? String) ?: "----"
+            val longitude = (s["longitude"] as? String) ?: ""
+            val latitude = (s["latitude"] as? String) ?: ""
             val routeValid = (s["route_valid"] as? Boolean) ?: false
             val isDet = (s["is_detailed"] as? Boolean) ?: false
             val cat = TrainCategorizer.categorize(fullTrain, isDet)
@@ -532,7 +565,9 @@ class LbjDecoder(
                 isRouteValid = routeValid,
                 isHit = isHit,
                 timestamp = now,
-                rawBcd = bcd
+                rawBcd = bcd,
+                longitude = longitude,
+                latitude = latitude
             )
 
             if (keywords.isNotEmpty() && filterMode == "strict" && !isHit) {
