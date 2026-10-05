@@ -139,6 +139,45 @@ fun LocomotiveLibraryScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "当前使用",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (source == LocomotiveLibrarySource.BUILTIN) "内置车型库" else "外置车型库",
+                        color = PrimaryBlueDark,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = "${entries.size} 项",
+                    color = TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(
@@ -158,16 +197,6 @@ fun LocomotiveLibraryScreen(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = "当前库：" +
-                (if (source == LocomotiveLibrarySource.BUILTIN) "内置车型库" else "外置车型库") +
-                "    共 " + entries.size + " 项",
-            color = TextSecondary,
-            fontSize = 12.sp
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         if (entries.isEmpty()) {
             Card(
