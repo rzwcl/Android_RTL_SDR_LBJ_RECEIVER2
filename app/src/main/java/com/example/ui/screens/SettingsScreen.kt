@@ -101,6 +101,7 @@ fun SettingsScreen(
     onClearTtsCache: () -> Pair<Int, Long> = { Pair(0, 0L) },
     onToggleEnableExternalAutomation: (Boolean) -> Unit = {},
     onOpenLocomotiveLibrary: () -> Unit = {},
+    onOpenDailyCsv: () -> Unit = {},
     onResetAllSettings: () -> Unit,
     onLaunchDriver: () -> Unit,
     onInstallDriver: () -> Unit = {},
@@ -330,6 +331,13 @@ fun SettingsScreen(
                         )
                     )
                 }
+
+                SettingsItem(
+                    title = "每日 CSV 数据",
+                    subtitle = "查看按自然日保存的原始 LBJ 信号 CSV，并单独导出某一天",
+                    value = "管理",
+                    onClick = onOpenDailyCsv
+                )
 
                 SettingsItem(
                     title = "车型库",
