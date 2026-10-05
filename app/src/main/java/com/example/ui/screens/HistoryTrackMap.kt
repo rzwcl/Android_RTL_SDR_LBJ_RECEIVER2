@@ -59,6 +59,7 @@ private data class MapPoint(
 fun HistoryTrackMap(
     signals: List<TrainSignalRecord>,
     mapSource: HistoryMapSource = HistoryMapSource.OSM,
+    selectedSignalId: Long? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -114,7 +115,7 @@ fun HistoryTrackMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            renderHistoryTrack(view, mapPoints, mapSource)
+            renderHistoryTrack(view, mapPoints, mapSource, selectedSignalId)
         }
     )
 }
@@ -122,7 +123,8 @@ fun HistoryTrackMap(
 private fun renderHistoryTrack(
     mapView: MapView,
     points: List<MapPoint>,
-    mapSource: HistoryMapSource
+    mapSource: HistoryMapSource,
+    selectedSignalId: Long?
 ) {
     mapView.setTileSource(
         when (mapSource) {
@@ -141,16 +143,26 @@ private fun renderHistoryTrack(
     val uniqueGeoPoints = geoPoints.distinctBy { point ->
         point.latitude.toString() + "," + point.longitude.toString()
     }
+    val selectedPoint = selectedSignalId?.let { signalId ->
+        points.firstOrNull { it.signal.id == signalId }
+    }
 
-    if (uniqueGeoPoints.size <= 1) {
-        mapView.controller.setCenter(geoPoints.first())
-        mapView.controller.setZoom(17.0)
-    } else {
-        val bounds = BoundingBox.fromGeoPoints(uniqueGeoPoints)
-        mapView.controller.setCenter(bounds.center)
-        mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
-        val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
-        mapView.controller.setZoom(zoom)
+    when {
+        selectedPoint != null -> {
+            mapView.controller.setCenter(selectedPoint.geoPoint)
+            mapView.controller.setZoom(16.0)
+        }
+        uniqueGeoPoints.size <= 1 -> {
+            mapView.controller.setCenter(geoPoints.first())
+            mapView.controller.setZoom(17.0)
+        }
+        else -> {
+            val bounds = BoundingBox.fromGeoPoints(uniqueGeoPoints)
+            mapView.controller.setCenter(bounds.center)
+            mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
+            val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
+            mapView.controller.setZoom(zoom)
+        }
     }
 
     if (geoPoints.size >= 2) {
@@ -162,13 +174,13 @@ private fun renderHistoryTrack(
         mapView.overlays.add(polyline)
     }
 
-    val lastPoint = points.last()
+    val markerPoint = selectedPoint ?: points.last()
     val marker = Marker(mapView).apply {
-        position = lastPoint.geoPoint
+        position = markerPoint.geoPoint
         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
         icon = createTrainMarkerDrawable(mapView)
-        title = lastPoint.signal.trainNo
-        snippet = buildMarkerSnippet(lastPoint.signal)
+        title = markerPoint.signal.trainNo + " · " + markerPoint.signal.positionKm
+        snippet = buildMarkerSnippet(markerPoint.signal)
     }
     mapView.overlays.add(marker)
 
