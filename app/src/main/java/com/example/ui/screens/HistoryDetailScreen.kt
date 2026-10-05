@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -129,7 +130,9 @@ fun HistoryDetailScreen(
                 text = "轨迹地图",
                 color = TextPrimary,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -151,13 +154,20 @@ fun HistoryDetailScreen(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            HistoryTrackMap(
-                signals = signals,
-                mapSource = mapSource,
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
-            )
+                    .height(224.dp)
+                    .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard)
+            ) {
+                HistoryTrackMap(
+                    signals = signals,
+                    mapSource = mapSource,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
         }
 
