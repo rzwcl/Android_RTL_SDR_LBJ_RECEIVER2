@@ -74,6 +74,7 @@ import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceSecondary
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.util.RailwayMapDataInfo
 import java.util.Locale
 
 @Composable
@@ -102,6 +103,8 @@ fun SettingsScreen(
     onToggleEnableExternalAutomation: (Boolean) -> Unit = {},
     onOpenLocomotiveLibrary: () -> Unit = {},
     onOpenDailyCsv: () -> Unit = {},
+    railwayMapDataInfo: RailwayMapDataInfo? = null,
+    onImportRailwayMapData: () -> Unit = {},
     onResetAllSettings: () -> Unit,
     onLaunchDriver: () -> Unit,
     onInstallDriver: () -> Unit = {},
@@ -344,6 +347,17 @@ fun SettingsScreen(
                     subtitle = "维护 LBJ 机车代号与车型名称；可选择内置或外置车型库并导入/导出 TXT",
                     value = "管理",
                     onClick = onOpenLocomotiveLibrary
+                )
+
+                val railwayMapSubtitle = railwayMapDataInfo?.let {
+                    "当前：${it.fileName} · ${it.lineCount} 条线路 · ${it.stationCount} 个车站；详情页在卫星影像上叠加本地铁路数据"
+                } ?: "导入 GeoJSON / JSON 铁路地图；详情页只使用卫星影像 + 本地线路，不依赖 OSM 在线底图"
+
+                SettingsItem(
+                    title = "铁路地图数据",
+                    subtitle = railwayMapSubtitle,
+                    value = if (railwayMapDataInfo == null) "导入" else "重新导入",
+                    onClick = onImportRailwayMapData
                 )
 
                 val themeLabel = when (state.themeMode) {
