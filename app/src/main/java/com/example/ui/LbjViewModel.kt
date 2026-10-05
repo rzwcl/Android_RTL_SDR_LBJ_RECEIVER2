@@ -48,6 +48,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
 import java.nio.charset.Charset
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -56,6 +57,11 @@ enum class ReceiverConnectionMode {
     SDR,
     TCP
 }
+
+data class HistoryImportResult(
+    val importedCount: Int,
+    val alreadyImported: Boolean = false
+)
 
 data class DailyCsvFileInfo(
     val name: String,
@@ -1296,10 +1302,18 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         records.size
     }
 
-    suspend fun importHistoryCsv(uri: Uri): Int = withContext(Dispatchers.IO) {
+    suspend fun importHistoryCsv(uri: Uri): HistoryImportResult = withContext(Dispatchers.IO) {
         val resolver = getApplication<Application>().contentResolver
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IllegalStateException("无法打开导入文件")
+
+        val fingerprint = sha256Hex(bytes)
+        if (prefs.hasImportedHistoryCsv(fingerprint)) {
+            return@withContext HistoryImportResult(
+                importedCount = 0,
+                alreadyImported = true
+            )
+        }
 
         val utf8 = bytes.toString(Charsets.UTF_8)
         val text = if (utf8.contains("时间,车次,方向,速度")) {
@@ -1308,7 +1322,18 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
             bytes.toString(Charsets.forName("GB18030"))
         }
         val rows = HistoryCsvCodec.parse(text)
-        importHistoryRows(rows)
+        val importedCount = importHistoryRows(rows)
+        prefs.markHistoryCsvImported(fingerprint)
+        HistoryImportResult(importedCount = importedCount)
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+        val builder = StringBuilder(digest.size * 2)
+        digest.forEach { byte ->
+            builder.append("%02x".format(Locale.ROOT, byte.toInt() and 0xFF))
+        }
+        return builder.toString()
     }
 
     private suspend fun importHistoryRows(rows: List<HistoryCsvCodec.Row>): Int {
