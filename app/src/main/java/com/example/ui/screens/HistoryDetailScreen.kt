@@ -23,12 +23,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -106,7 +109,7 @@ fun HistoryDetailScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(pageScrollState)
-            .padding(16.dp)
+            .padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -127,7 +130,7 @@ fun HistoryDetailScreen(
                 Text(
                     text = "列车详情 · " + record.trainNo,
                     color = PrimaryBlueDark,
-                    fontSize = 18.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
@@ -136,12 +139,69 @@ fun HistoryDetailScreen(
                     fontSize = 12.sp
                 )
             }
+
+            Box {
+                var mapMenuExpanded by remember { mutableStateOf(false) }
+
+                Card(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { mapMenuExpanded = true },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (mapMode == HistoryMapMode.OSM) {
+                            SurfaceSecondary
+                        } else {
+                            PrimaryBlueDark.copy(alpha = 0.10f)
+                        }
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (mapMode == HistoryMapMode.OSM) "OSM" else "ESRI",
+                            color = if (mapMode == HistoryMapMode.OSM) TextPrimary else PrimaryBlueDark,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "选择地图类型",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = mapMenuExpanded,
+                    onDismissRequest = { mapMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("OSM") },
+                        onClick = {
+                            mapMode = HistoryMapMode.OSM
+                            mapMenuExpanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("ESRI") },
+                        onClick = {
+                            mapMode = HistoryMapMode.SATELLITE
+                            mapMenuExpanded = false
+                        }
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         HistorySummaryCard(
             record = record,
+            selectedSignal = selectedSignalId?.let { id -> signals.firstOrNull { it.id == id } },
             durationText = durationText,
             firstSeenText = timeFormat.format(Date(record.firstSeenTime)),
             lastSeenText = timeFormat.format(Date(record.lastSeenTime))
@@ -152,43 +212,10 @@ fun HistoryDetailScreen(
         val hasCoordinates = signals.any { hasSignalCoordinate(it) }
         val hasRailwayMapData = railwayMapData?.hasFeatures == true
         if (hasCoordinates || hasRailwayMapData) {
-            Text(
-                text = "线路地图",
-                color = TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                text = when (mapMode) {
-                    HistoryMapMode.OSM -> "OpenStreetMap"
-                    HistoryMapMode.SATELLITE -> {
-                        if (hasRailwayMapData) "卫星影像 + 本地铁路数据" else "卫星影像"
-                    }
-                },
-                color = TextSecondary,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.OSM }) {
-                    Text("OSM")
-                }
-                androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.SATELLITE }) {
-                    Text("卫星")
-                }
-            }
-            Spacer(modifier = Modifier.height(2.dp))
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(224.dp)
+                    .height(292.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
                 shape = RoundedCornerShape(12.dp),
@@ -205,6 +232,7 @@ fun HistoryDetailScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
         if (signals.isEmpty()) {
+            Spacer(modifier = Modifier.height(20.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -253,12 +281,22 @@ fun HistoryDetailScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
         }
+        Spacer(modifier = Modifier.height(32.dp))
     }
+}
+
+private fun buildCoordinateText(signal: TrainSignalRecord?): String {
+    if (signal == null || !hasSignalCoordinate(signal)) return "暂无经纬信息"
+    return listOf(signal.longitude.trim(), signal.latitude.trim())
+        .filter { it.isNotEmpty() }
+        .joinToString(" ")
+        .ifBlank { "暂无经纬信息" }
 }
 
 @Composable
 private fun HistorySummaryCard(
     record: TrainRecord,
+    selectedSignal: TrainSignalRecord?,
     durationText: String,
     firstSeenText: String,
     lastSeenText: String
@@ -276,7 +314,7 @@ private fun HistorySummaryCard(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceCard)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -284,7 +322,7 @@ private fun HistorySummaryCard(
                 Text(
                     text = record.trainNo,
                     color = TextPrimary,
-                    fontSize = 22.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
@@ -293,9 +331,9 @@ private fun HistorySummaryCard(
                     modifier = Modifier
                         .background(dirBg, RoundedCornerShape(4.dp))
                         .border(0.5.dp, dirFg.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text(record.direction, color = dirFg, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(record.direction, color = dirFg, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
@@ -319,6 +357,11 @@ private fun HistorySummaryCard(
                 value = record.route
             )
             DetailLine(
+                icon = Icons.Default.LocationOn,
+                label = "经纬度",
+                value = buildCoordinateText(selectedSignal)
+            )
+            DetailLine(
                 icon = Icons.Default.AccessTime,
                 label = "首次收到",
                 value = firstSeenText
@@ -335,13 +378,13 @@ private fun HistorySummaryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(SurfaceSecondary, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                    .padding(horizontal = 11.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = "持续 " + durationText,
                     color = PrimaryBlueDark,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace
                 )
                 Text(
@@ -363,7 +406,7 @@ private fun DetailLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
+             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -376,12 +419,12 @@ private fun DetailLine(
         Text(
             text = label + ": ",
             color = TextMuted,
-            fontSize = 12.sp
+            .padding(vertical = 4.dp),
         )
         Text(
             text = value.ifBlank { "未知" },
             color = TextPrimary,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Medium
         )
     }
