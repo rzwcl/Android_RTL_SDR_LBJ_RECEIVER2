@@ -21,6 +21,8 @@ class RtlTcpClient(
     val dcOffsetHz: Double = DspConstants.DEFAULT_DC_OFFSET_HZ,
     val sampleRate: Int = DspConstants.RTL_SAMPLE_RATE,
     initialGainDb: Float = DspConstants.HW_GAIN_DB,
+    initialTunerAgc: Boolean = false,
+    initialRtlAgc: Boolean = false,
     initialPpm: Int = DspConstants.PPM,
     val blockSize: Int = DspConstants.BLOCK_SIZE
 ) {
@@ -31,6 +33,10 @@ class RtlTcpClient(
     var targetFreqHz: Double = initialFreqHz
         private set
     var gainDb: Float = initialGainDb
+        private set
+    var tunerAgc: Boolean = initialTunerAgc
+        private set
+    var rtlAgc: Boolean = initialRtlAgc
         private set
     var ppm: Int = initialPpm
         private set
@@ -169,10 +175,12 @@ class RtlTcpClient(
             // Send initial tuning commands
             sendCmd(DspConstants.CMD_SET_SAMPLERATE, sampleRate.toLong())
             sendCmd(DspConstants.CMD_SET_FREQ, hwFreqHz.toLong())
-            sendCmd(DspConstants.CMD_SET_GAINMODE, 1L)
-            sendCmd(DspConstants.CMD_SET_GAIN, (gainDb * 10).toLong())
+            sendCmd(DspConstants.CMD_SET_GAINMODE, if (tunerAgc) 0L else 1L)
+            if (!tunerAgc) {
+                sendCmd(DspConstants.CMD_SET_GAIN, (gainDb * 10).toLong())
+            }
             sendCmd(DspConstants.CMD_SET_FREQCORR, ppm.toLong())
-            sendCmd(DspConstants.CMD_SET_AGC, 0L)
+            sendCmd(DspConstants.CMD_SET_AGC, if (rtlAgc) 1L else 0L)
 
             setState(ConnectionState.CONNECTED, null)
 
@@ -243,8 +251,23 @@ class RtlTcpClient(
             }
         }
         gainDb = nearest
-        sendCmd(DspConstants.CMD_SET_GAINMODE, 1L)
-        sendCmd(DspConstants.CMD_SET_GAIN, (nearest * 10).toLong())
+        if (!tunerAgc) {
+            sendCmd(DspConstants.CMD_SET_GAINMODE, 1L)
+            sendCmd(DspConstants.CMD_SET_GAIN, (nearest * 10).toLong())
+        }
+    }
+
+    fun setTunerAgc(enabled: Boolean) {
+        tunerAgc = enabled
+        sendCmd(DspConstants.CMD_SET_GAINMODE, if (enabled) 0L else 1L)
+        if (!enabled) {
+            sendCmd(DspConstants.CMD_SET_GAIN, (gainDb * 10).toLong())
+        }
+    }
+
+    fun setRtlAgc(enabled: Boolean) {
+        rtlAgc = enabled
+        sendCmd(DspConstants.CMD_SET_AGC, if (enabled) 1L else 0L)
     }
 
     fun setPpm(newPpm: Int) {
