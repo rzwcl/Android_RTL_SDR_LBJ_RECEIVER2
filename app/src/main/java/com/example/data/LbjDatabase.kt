@@ -73,6 +73,9 @@ interface LbjDao {
     @Query("SELECT * FROM train_signal_records WHERE trainRecordId = :trainRecordId ORDER BY timestamp ASC, id ASC")
     fun getTrainSignalRecords(trainRecordId: Long): Flow<List<TrainSignalRecord>>
 
+    @Query("SELECT * FROM train_signal_records ORDER BY timestamp ASC, id ASC")
+    suspend fun getAllTrainSignalRecordsList(): List<TrainSignalRecord>
+
     @Query("DELETE FROM train_signal_records WHERE trainRecordId = :trainRecordId")
     suspend fun deleteTrainSignalRecords(trainRecordId: Long)
 
