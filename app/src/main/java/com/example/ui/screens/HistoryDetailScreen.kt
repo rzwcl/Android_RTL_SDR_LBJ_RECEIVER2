@@ -163,8 +163,9 @@ fun HistoryDetailScreen(
             Text(
                 text = when (mapMode) {
                     HistoryMapMode.OSM -> "OpenStreetMap"
-                    HistoryMapMode.SATELLITE -> "卫星影像"
-                    HistoryMapMode.SATELLITE_RAILWAY -> "卫星影像 + 本地铁路数据"
+                    HistoryMapMode.SATELLITE -> {
+                        if (hasRailwayMapData) "卫星影像 + 本地铁路数据" else "卫星影像"
+                    }
                 },
                 color = TextSecondary,
                 fontSize = 11.sp,
@@ -182,11 +183,6 @@ fun HistoryDetailScreen(
                 androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.SATELLITE }) {
                     Text("卫星")
                 }
-                if (hasRailwayMapData) {
-                    androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.SATELLITE_RAILWAY }) {
-                        Text("卫星+铁路")
-                    }
-                }
             }
             Spacer(modifier = Modifier.height(2.dp))
             Card(
@@ -200,7 +196,7 @@ fun HistoryDetailScreen(
             ) {
                 HistoryTrackMap(
                     signals = signals,
-                    railwayMapData = if (mapMode == HistoryMapMode.SATELLITE_RAILWAY) railwayMapData else null,
+                    railwayMapData = railwayMapData,
                     mapMode = mapMode,
                     selectedSignalId = selectedSignalId,
                     modifier = Modifier.fillMaxSize()
