@@ -589,9 +589,9 @@ private class TrainPositionOverlay(
                 centerX - halfWidth, top + 10f * density
             )
             lineTo(centerX - halfWidth, bottom - 4f * density)
-            quadraticTo(centerX - halfWidth, bottom, centerX - 5f * density, bottom)
+            quadTo(centerX - halfWidth, bottom, centerX - 5f * density, bottom)
             lineTo(centerX + 5f * density, bottom)
-            quadraticTo(centerX + halfWidth, bottom, centerX + halfWidth, bottom - 4f * density)
+            quadTo(centerX + halfWidth, bottom, centerX + halfWidth, bottom - 4f * density)
             lineTo(centerX + halfWidth, top + 10f * density)
             cubicTo(
                 centerX + halfWidth, top + 6f * density,
