@@ -67,6 +67,18 @@ interface LbjDao {
     @Query("DELETE FROM train_records WHERE id = :id")
     suspend fun deleteTrainRecord(id: Long)
 
+    @Insert
+    suspend fun insertTrainSignalRecord(record: TrainSignalRecord): Long
+
+    @Query("SELECT * FROM train_signal_records WHERE trainRecordId = :trainRecordId ORDER BY timestamp ASC, id ASC")
+    fun getTrainSignalRecords(trainRecordId: Long): Flow<List<TrainSignalRecord>>
+
+    @Query("DELETE FROM train_signal_records WHERE trainRecordId = :trainRecordId")
+    suspend fun deleteTrainSignalRecords(trainRecordId: Long)
+
+    @Query("DELETE FROM train_signal_records")
+    suspend fun clearAllTrainSignalRecords()
+
     // Route station kilometers
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRouteStationKm(entity: RouteStationKmEntity)
@@ -85,11 +97,40 @@ interface LbjDao {
 }
 
 @Database(
-    entities = [TrainRecord::class, RouteStationKmEntity::class],
-    version = 3,
+    entities = [TrainRecord::class, TrainSignalRecord::class, RouteStationKmEntity::class],
+    version = 4,
     exportSchema = false
 )
 abstract class LbjDatabase : RoomDatabase() {
+
+    companion object {
+        private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS train_signal_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        trainRecordId INTEGER NOT NULL,
+                        trainNo TEXT NOT NULL,
+                        direction TEXT NOT NULL,
+                        speed TEXT NOT NULL,
+                        locoModel TEXT NOT NULL,
+                        locoCode TEXT NOT NULL,
+                        route TEXT NOT NULL,
+                        positionKm TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        longitude TEXT NOT NULL,
+                        latitude TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_train_signal_records_trainRecordId_timestamp ON train_signal_records(trainRecordId, timestamp)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_train_signal_records_timestamp ON train_signal_records(timestamp)"
+                )
+            }
+        }
     abstract fun lbjDao(): LbjDao
 
     companion object {
@@ -102,7 +143,10 @@ abstract class LbjDatabase : RoomDatabase() {
                     context.applicationContext,
                     LbjDatabase::class.java,
                     "lbj_receiver_db"
-                ).fallbackToDestructiveMigration(dropAllTables = true).build()
+                )
+                    .addMigrations(MIGRATION_3_4)
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
                 INSTANCE = instance
                 instance
             }
