@@ -132,12 +132,21 @@ class LocomotiveLibraryManager(context: Context) {
     fun exportText(): String {
         val builder = StringBuilder()
         builder.append('﻿')
-        builder.appendLine("代号	车型")
-        getEntries().forEach { entry ->
-            builder.append(entry.code)
-                .append('	')
-                .appendLine(entry.name)
-        }
+        builder.appendLine("# ==================== 铁路机车车型库 ====================")
+        builder.appendLine("# 格式: 注册号=车型名称")
+        builder.appendLine("# 以 # 开头的行为注释，会被忽略")
+        builder.appendLine("# ======================================================")
+
+        getEntries()
+            .chunked(5)
+            .forEach { chunk ->
+                builder.appendLine(
+                    chunk.joinToString("    ") { entry ->
+                        entry.code.toString() + "=" + entry.name
+                    }
+                )
+            }
+
         return builder.toString()
     }
 
