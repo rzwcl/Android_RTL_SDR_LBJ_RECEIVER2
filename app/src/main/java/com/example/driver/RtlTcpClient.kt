@@ -208,7 +208,7 @@ class RtlTcpClient(
         } catch (e: Exception) {
             if (isRunning.get()) {
                 val msg = if (e is java.net.ConnectException) {
-                    "【连接被拒】未检测到运行中的 RTL-SDR 驱动，请先点击启动驱动或开启测试仿真模式。"
+                    "【连接被拒】无法连接 RTL-TCP 服务端 " + host + ":" + port
                 } else {
                     "网络流异常: ${e.localizedMessage ?: e.message}"
                 }
