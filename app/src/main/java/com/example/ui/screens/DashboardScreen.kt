@@ -746,9 +746,9 @@ fun DashboardScreen(
         Text(
             text = "快速调谐与参数 (Quick Controls)",
             color = TextSecondary,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(bottom = 9.dp)
         )
 
         Row(
@@ -765,9 +765,9 @@ fun DashboardScreen(
                     .padding(8.dp)
             ) {
                 Column {
-                    Text("频率", color = TextMuted, fontSize = 10.sp)
+                    Text("频率", color = TextMuted, fontSize = 11.sp)
                     Text(
-                        String.format(Locale.US, "%.4f M", state.freqHz / 1_000_000.0),
+                        String.format(Locale.US, "%.4f MHz", state.freqHz / 1_000_000.0),
                         color = PrimaryBlueDark,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -796,7 +796,7 @@ fun DashboardScreen(
                     .padding(8.dp)
             ) {
                 Column {
-                    Text("增益", color = TextMuted, fontSize = 10.sp)
+                    Text("增益", color = TextMuted, fontSize = 11.sp)
                     Text(
                         String.format(Locale.US, "%.1f dB", state.gainDb),
                         color = TextPrimary,
@@ -817,7 +817,7 @@ fun DashboardScreen(
                     .padding(8.dp)
             ) {
                 Column {
-                    Text("PPM", color = TextMuted, fontSize = 10.sp)
+                    Text("PPM", color = TextMuted, fontSize = 11.sp)
                     Text(
                         "${state.ppm}",
                         color = TextPrimary,
@@ -838,7 +838,7 @@ fun DashboardScreen(
                     .padding(8.dp)
             ) {
                 Column {
-                    Text("门限", color = TextMuted, fontSize = 10.sp)
+                    Text("门限", color = TextMuted, fontSize = 11.sp)
                     Text(
                         String.format(Locale.US, "%.0f dB", state.csThresholdDb),
                         color = EmeraldGreen,
@@ -849,26 +849,6 @@ fun DashboardScreen(
                 }
             }
 
-            // Watchlist Chip
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(SurfaceCard, RoundedCornerShape(8.dp))
-                    .border(1.dp, BorderLight, RoundedCornerShape(8.dp))
-                    .clickable { onOpenWatchlistDialog() }
-                    .padding(8.dp)
-            ) {
-                Column {
-                    Text("关注", color = TextMuted, fontSize = 10.sp)
-                    val kwText = if (state.keywords.isNotEmpty()) "${state.keywords.size}个" else "全部"
-                    Text(
-                        kwText,
-                        color = AmberSignal,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -892,36 +872,54 @@ fun DashboardScreen(
             Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top
                 ) {
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 4.dp)
+                            .padding(end = 2.dp)
                     ) {
-                        Text(
-                            text = "Tuner AGC",
-                            color = if (state.tunerAgc) PrimaryBlueDark else TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Tuner AGC",
+                                color = TextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (state.tunerAgc) PrimaryBlueSoft else SurfaceSecondary,
+                                        RoundedCornerShape(5.dp)
+                                    )
+                                    .padding(horizontal = 7.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (state.tunerAgc) "已开启" else "已关闭",
+                                    color = if (state.tunerAgc) PrimaryBlueDark else TextMuted,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = "自动控制 R820T 模拟前端增益",
                             color = TextSecondary,
-                            fontSize = 10.5.sp,
-                            lineHeight = 14.sp
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (state.tunerAgc) "开启：手动增益已锁定" else "关闭：可手动调整硬件增益",
-                            color = if (state.tunerAgc) PrimaryBlueDark else TextMuted,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Medium
+                            text = if (state.tunerAgc) "自动调节硬件增益，手动增益已锁定" else "关闭后可手动调整硬件增益",
+                            color = if (state.tunerAgc) PrimaryBlueDark else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 16.sp
                         )
                     }
-
                     Switch(
                         checked = state.tunerAgc,
                         onCheckedChange = onToggleTunerAgc,
@@ -929,43 +927,60 @@ fun DashboardScreen(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = PrimaryBlue,
                             uncheckedTrackColor = SurfaceSecondary
-                        )
+                        ),
+                        modifier = Modifier.scale(1.05f)
                     )
-
                     Box(
                         modifier = Modifier
                             .width(1.dp)
-                            .height(64.dp)
+                            .height(76.dp)
                             .background(BorderLight)
                     )
-
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 4.dp)
+                            .padding(start = 2.dp)
                     ) {
-                        Text(
-                            text = "RTL AGC",
-                            color = if (state.rtlAgc) PrimaryBlueDark else TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "RTL AGC",
+                                color = TextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (state.rtlAgc) PrimaryBlueSoft else SurfaceSecondary,
+                                        RoundedCornerShape(5.dp)
+                                    )
+                                    .padding(horizontal = 7.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (state.rtlAgc) "已开启" else "已关闭",
+                                    color = if (state.rtlAgc) PrimaryBlueDark else TextMuted,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = "自动控制 RTL2832U 数字端 AGC",
                             color = TextSecondary,
-                            fontSize = 10.5.sp,
-                            lineHeight = 14.sp
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (state.rtlAgc) "开启：数字端自动增益" else "关闭：使用固定数字增益",
-                            color = if (state.rtlAgc) PrimaryBlueDark else TextMuted,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Medium
+                            text = if (state.rtlAgc) "数字端自动增益正在工作" else "关闭后使用固定数字增益",
+                            color = if (state.rtlAgc) PrimaryBlueDark else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 16.sp
                         )
                     }
-
                     Switch(
                         checked = state.rtlAgc,
                         onCheckedChange = onToggleRtlAgc,
@@ -973,12 +988,11 @@ fun DashboardScreen(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = PrimaryBlue,
                             uncheckedTrackColor = SurfaceSecondary
-                        )
+                        ),
+                        modifier = Modifier.scale(1.05f)
                     )
                 }
-
                 Spacer(modifier = Modifier.height(10.dp))
-
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -994,33 +1008,33 @@ fun DashboardScreen(
                                 onOpenGainDialog()
                             }
                         }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "手动硬件增益",
                             color = if (state.tunerAgc) TextMuted else TextPrimary,
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (state.tunerAgc) "Tuner AGC 开启后不可手动修改" else "点击设置 R820T Gain",
                             color = TextMuted,
-                            fontSize = 10.5.sp
+                            fontSize = 11.sp
                         )
                     }
                     Text(
                         text = if (state.tunerAgc) "自动" else String.format(Locale.US, "%.1f dB", state.gainDb),
                         color = if (state.tunerAgc) TextMuted else PrimaryBlueDark,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             }
         }
-
         Spacer(modifier = Modifier.height(14.dp))
 
         if (state.showPacketLogTab) {
@@ -1029,6 +1043,89 @@ fun DashboardScreen(
                 packetLogs = packetLogs,
                 onNavigateToPacketLogs = onNavigateToPacketLogs
             )
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Text(
+            text = "关注车次",
+            color = TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, BorderLight, RoundedCornerShape(12.dp))
+                .clickable { onOpenWatchlistDialog() },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard)
+        ) {
+            if (state.keywords.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "全部车次",
+                        color = AmberSignal,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "未设置关注名单",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    state.keywords.chunked(4).forEach { rowKeywords ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            rowKeywords.forEach { keyword ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(AmberSoft, RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = keyword,
+                                        color = AmberSignal,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            repeat(4 - rowKeywords.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    Text(
+                        text = "点击此处修改关注车次",
+                        color = TextMuted,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(top = 1.dp)
+                    )
+                }
+            }
         }
     }
 }
