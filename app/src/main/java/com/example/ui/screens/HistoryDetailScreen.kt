@@ -125,6 +125,14 @@ fun HistoryDetailScreen(
             it.longitude.isNotBlank() && it.latitude.isNotBlank()
         }
         if (hasCoordinates) {
+            Text(
+                text = "轨迹地图",
+                color = TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -148,7 +156,7 @@ fun HistoryDetailScreen(
                 mapSource = mapSource,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(260.dp)
+                    .height(220.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
