@@ -1515,13 +1515,6 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         data.info
     }
 
-    fun clearRailwayMapData() {
-        viewModelScope.launch(Dispatchers.IO) {
-            // Keep this feature replace-only for now; importing another file replaces the active dataset.
-            // The current file is intentionally retained unless a future UI exposes an explicit clear action.
-        }
-    }
-
     fun clearHistory() {
         viewModelScope.launch(Dispatchers.IO) {
             trainDbMutex.withLock {
