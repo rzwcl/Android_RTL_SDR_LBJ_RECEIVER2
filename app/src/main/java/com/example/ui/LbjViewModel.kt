@@ -48,6 +48,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
 import java.nio.charset.Charset
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -955,6 +957,58 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
             null
         } catch (e: Exception) {
             e.message ?: "TCP 地址设置失败"
+        }
+    }
+
+    fun testTcpConnection() {
+        if (_receiverState.value.connectionMode != ReceiverConnectionMode.TCP) {
+            _receiverState.value = _receiverState.value.copy(
+                warningMessage = "请先切换到 TCP 连接模式。"
+            )
+            return
+        }
+
+        if (_receiverState.value.isRunning) {
+            _receiverState.value = _receiverState.value.copy(
+                warningMessage = "正在接收中，请先停止接收再测试 TCP 连接。"
+            )
+            return
+        }
+
+        val host = _receiverState.value.host.trim()
+        val port = _receiverState.value.port
+        if (host.isEmpty()) {
+            _receiverState.value = _receiverState.value.copy(
+                connectionState = RtlTcpClient.ConnectionState.ERROR,
+                warningMessage = "TCP 主机地址不能为空。"
+            )
+            return
+        }
+
+        _receiverState.value = _receiverState.value.copy(
+            connectionState = RtlTcpClient.ConnectionState.CONNECTING,
+            warningMessage = ""
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(host, port), 3000)
+                }
+                withContext(Dispatchers.Main) {
+                    _receiverState.value = _receiverState.value.copy(
+                        connectionState = RtlTcpClient.ConnectionState.IDLE,
+                        warningMessage = "TCP 测试连接成功：$host:$port"
+                    )
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _receiverState.value = _receiverState.value.copy(
+                        connectionState = RtlTcpClient.ConnectionState.ERROR,
+                        warningMessage = "TCP 测试失败：$host:$port — ${e.message ?: "无法建立连接"}"
+                    )
+                }
+            }
         }
     }
 
