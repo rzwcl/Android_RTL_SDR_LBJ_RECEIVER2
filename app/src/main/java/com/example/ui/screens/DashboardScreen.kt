@@ -70,11 +70,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.decoder.EtaInfo
-import com.example.decoder.TrainTelemetry
 import com.example.driver.RtlTcpClient
 import com.example.ui.ReceiverState
-import com.example.ui.components.LiveTelemetryCard
 import com.example.ui.components.SpectrumWaterfallView
 import com.example.ui.theme.AmberSignal
 import com.example.ui.theme.AmberSoft
@@ -96,8 +93,6 @@ import java.util.Locale
 @Composable
 fun DashboardScreen(
     state: ReceiverState,
-    telemetry: TrainTelemetry,
-    etaInfo: EtaInfo,
     onStartReceiver: (Boolean) -> Unit,
     onStopReceiver: () -> Unit,
     onSetConnectionMode: (ReceiverConnectionMode) -> Unit = {},
@@ -111,7 +106,6 @@ fun DashboardScreen(
     onOpenCsDialog: () -> Unit,
     onOpenWatchlistDialog: () -> Unit,
     onOpenFftExplanationDialog: () -> Unit,
-    onOpenTrainTypeRuleDialog: () -> Unit,
     onToggleAlertTone: (Boolean) -> Unit,
     onToggleAlertNotification: (Boolean) -> Unit,
     onToggleBasebandAudio: (Boolean) -> Unit,
@@ -581,17 +575,6 @@ fun DashboardScreen(
             isReceiving = state.isRunning,
             isAdcClipping = state.isAdcClipping,
             onClick = onOpenFftExplanationDialog
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Live Telemetry HUD Card
-        LiveTelemetryCard(
-            telemetry = telemetry,
-            etaInfo = etaInfo,
-            warningMessage = state.warningMessage,
-            currentStationKmText = state.currentRouteStationKmText,
-            onOpenTrainTypeRuleDialog = onOpenTrainTypeRuleDialog
         )
 
         Spacer(modifier = Modifier.height(14.dp))
