@@ -47,7 +47,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
+import java.nio.ByteBuffer
 import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.MessageDigest
@@ -1339,14 +1341,17 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         val resolver = getApplication<Application>().contentResolver
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IllegalStateException("无法打开车型库文件")
-        val text = String(bytes, Charsets.UTF_8)
-        val count = locomotiveLibraryManager.importText(
-            if (text.contains("车型") || text.contains("代号") || text.contains("代码")) {
-                text
-            } else {
-                String(bytes, Charset.forName("GB18030"))
-            }
-        )
+        val text = try {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        } catch (_: Exception) {
+            String(bytes, Charset.forName("GB18030"))
+        }
+
+        val count = locomotiveLibraryManager.importText(text)
         refreshLocomotiveLibrary()
         count
     }
