@@ -160,7 +160,8 @@ fun LocomotiveLibraryScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "当前库：" + if (source == LocomotiveLibrarySource.BUILTIN) "内置车型库" else "外置车型库" +
+            text = "当前库：" +
+                (if (source == LocomotiveLibrarySource.BUILTIN) "内置车型库" else "外置车型库") +
                 "    共 " + entries.size + " 项",
             color = TextSecondary,
             fontSize = 12.sp
@@ -271,7 +272,14 @@ fun LocomotiveLibraryScreen(
                         editorError = when {
                             code == null || code !in 0..999 -> "车型代号必须是 0~999"
                             nameText.trim().isEmpty() -> "车型名称不能为空"
-                            else -> onAddOrEdit(code, nameText)
+                            else -> {
+                                editingEntry?.let { oldEntry ->
+                                    if (oldEntry.code != code) {
+                                        onDelete(oldEntry.code)
+                                    }
+                                }
+                                onAddOrEdit(code, nameText)
+                            }
                         }
                         if (editorError == null) {
                             showEditor = false
