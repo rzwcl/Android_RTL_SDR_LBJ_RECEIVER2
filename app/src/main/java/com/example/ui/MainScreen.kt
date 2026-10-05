@@ -1,6 +1,10 @@
 package com.example.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -23,6 +27,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -36,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,6 +79,9 @@ import com.example.ui.theme.TextSecondary
 import com.example.ui.screens.LocomotiveLibraryScreen
 import com.example.util.LocomotiveLibrarySource
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -215,6 +225,37 @@ fun MainScreen(viewModel: LbjViewModel) {
     val locomotiveLibraryEntries by viewModel.locomotiveLibraryEntries.collectAsState()
     val locomotiveLibrarySource by viewModel.locomotiveLibrarySource.collectAsState()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    var lastBackPressTime by remember { mutableStateOf(0L) }
+
+    BackHandler {
+        when {
+            selectedHistoryRecordId != null -> {
+                selectedHistoryRecordId = null
+            }
+            showLocomotiveLibrary -> {
+                showLocomotiveLibrary = false
+            }
+            showDailyCsv -> {
+                showDailyCsv = false
+            }
+            selectedTab != 0 -> {
+                selectedTab = 0
+            }
+            else -> {
+                val now = System.currentTimeMillis()
+                if (now - lastBackPressTime <= 2000L) {
+                    context.findActivity()?.finish()
+                } else {
+                    lastBackPressTime = now
+                    scope.launch {
+                        snackbarHostState.showSnackbar("再按一次返回退出应用")
+                    }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(selectedTab) {
         if (selectedTab != 2) {
             selectedHistoryRecordId = null
@@ -246,15 +287,23 @@ fun MainScreen(viewModel: LbjViewModel) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "SDR-LBJ",
-                        color = TextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        Text(
+                            text = "SDR-LBJ",
+                            color = TextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCard)
             )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         },
         bottomBar = {
             NavigationBar(
@@ -388,7 +437,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                             )
                         },
                         onExportCsv = {
-                            exportHistoryLauncher.launch("LBJ-History.csv")
+                            exportHistoryLauncher.launch(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) + ".csv")
                         },
                         modifier = screenModifier
                     )
@@ -602,5 +651,13 @@ fun MainScreen(viewModel: LbjViewModel) {
             onInstall = { viewModel.installDriverApk() },
             onDismiss = { viewModel.dismissDriverInstallGuide() }
         )
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 }
