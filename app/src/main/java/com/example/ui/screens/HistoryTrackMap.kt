@@ -544,9 +544,9 @@ private class TrainMarkerDrawable(
                 cx - halfWidth, bodyTop + 12f * density
             )
             lineTo(cx - halfWidth, bodyBottom - 7f * density)
-            quadraticTo(cx - halfWidth, bodyBottom, cx - halfWidth * 0.55f, bodyBottom)
+            quadTo(cx - halfWidth, bodyBottom, cx - halfWidth * 0.55f, bodyBottom)
             lineTo(cx + halfWidth * 0.55f, bodyBottom)
-            quadraticTo(cx + halfWidth, bodyBottom, cx + halfWidth, bodyBottom - 7f * density)
+            quadTo(cx + halfWidth, bodyBottom, cx + halfWidth, bodyBottom - 7f * density)
             lineTo(cx + halfWidth, bodyTop + 12f * density)
             cubicTo(
                 cx + halfWidth, bodyTop + 8f * density,
@@ -612,9 +612,9 @@ private fun calculateTrainBearing(
 
     return when {
         markerIndex < points.lastIndex ->
-            points[markerIndex].geoPoint.bearingTo(points[markerIndex + 1].geoPoint)
+            points[markerIndex].geoPoint.bearingTo(points[markerIndex + 1].geoPoint).toFloat()
         markerIndex > 0 ->
-            points[markerIndex - 1].geoPoint.bearingTo(points[markerIndex].geoPoint)
+            points[markerIndex - 1].geoPoint.bearingTo(points[markerIndex].geoPoint).toFloat()
         else -> 0f
     }
 }
