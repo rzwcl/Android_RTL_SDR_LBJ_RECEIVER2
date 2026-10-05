@@ -30,6 +30,12 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.max
 
+enum class HistoryMapMode {
+    OSM,
+    SATELLITE,
+    SATELLITE_RAILWAY
+}
+
 private val EsriWorldImageryTileSource = object : OnlineTileSourceBase(
     "ESRI World Imagery",
     0,
@@ -80,6 +86,7 @@ private class HistoryMapView(context: Context) : MapView(context) {
 fun HistoryTrackMap(
     signals: List<TrainSignalRecord>,
     railwayMapData: RailwayMapData? = null,
+    mapMode: HistoryMapMode = HistoryMapMode.OSM,
     selectedSignalId: Long? = null,
     modifier: Modifier = Modifier
 ) {
@@ -113,7 +120,7 @@ fun HistoryTrackMap(
         Configuration.getInstance().userAgentValue =
             "SDR-LBJ/1.1.2 (" + context.packageName + ")"
         HistoryMapView(context).apply {
-            setTileSource(EsriWorldImageryTileSource)
+            setTileSource(if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource)
             setMultiTouchControls(true)
             setUseDataConnection(true)
             minZoomLevel = 2.0
@@ -169,7 +176,9 @@ private fun renderHistoryTrack(
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
-    mapView.setTileSource(EsriWorldImageryTileSource)
+    mapView.setTileSource(
+        if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource
+    )
     mapView.overlays.clear()
 
     val geoPoints = points.map { it.geoPoint }
@@ -208,7 +217,7 @@ private fun renderHistoryTrack(
     }
 
     val density = mapView.resources.displayMetrics.density
-    railwayMapData?.lines?.forEach { line ->
+    if (mapMode == HistoryMapMode.SATELLITE_RAILWAY) railwayMapData?.lines?.forEach { line ->
         if (line.points.size < 2) return@forEach
 
         if (line.outlineWidth > 0f) {
@@ -228,7 +237,7 @@ private fun renderHistoryTrack(
         mapView.overlays.add(polyline)
     }
 
-    railwayMapData?.stations?.forEach { station ->
+    if (mapMode == HistoryMapMode.SATELLITE_RAILWAY) railwayMapData?.stations?.forEach { station ->
         val marker = Marker(mapView).apply {
             position = station.point
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
