@@ -137,5 +137,4 @@ class LbjCsvLogger(context: Context) {
             return value
         }
         return """ + value.replace(""", """") + """
-    }
-}
+    }}
