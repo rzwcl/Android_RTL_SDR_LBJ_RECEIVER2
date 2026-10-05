@@ -1,9 +1,11 @@
 package com.example.ui
 
 import android.app.Application
+import android.net.Uri
 import android.os.Process
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.example.data.LbjDatabase
 import com.example.data.RouteStationKmEntity
 import com.example.data.TrainRecord
@@ -24,6 +26,7 @@ import com.example.dsp.RssiGate
 import com.example.service.LbjKeepAliveService
 import com.example.util.BasebandAudioPlayer
 import com.example.util.LbjPreferences
+import com.example.util.HistoryCsvCodec
 import com.example.util.LbjCsvLogger
 import com.example.util.SoundAlertManager
 import kotlinx.coroutines.Dispatchers
@@ -1111,6 +1114,108 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getTrainSignalRecords(trainRecordId: Long): Flow<List<TrainSignalRecord>> {
         return dao.getTrainSignalRecords(trainRecordId)
+    }
+
+    suspend fun exportHistoryCsv(uri: Uri): Int = withContext(Dispatchers.IO) {
+        val records = dao.getAllTrainSignalRecordsList()
+        val csv = HistoryCsvCodec.encode(records)
+        val resolver = getApplication<Application>().contentResolver
+        resolver.openOutputStream(uri)?.use { output ->
+            output.write(csv.toByteArray(Charsets.UTF_8))
+            output.flush()
+        } ?: throw IllegalStateException("无法打开导出文件")
+        records.size
+    }
+
+    suspend fun importHistoryCsv(uri: Uri): Int = withContext(Dispatchers.IO) {
+        val resolver = getApplication<Application>().contentResolver
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IllegalStateException("无法打开导入文件")
+
+        val utf8 = bytes.toString(Charsets.UTF_8)
+        val text = if (utf8.contains("时间,车次,方向,速度")) {
+            utf8
+        } else {
+            bytes.toString(Charsets.forName("GB18030"))
+        }
+        val rows = HistoryCsvCodec.parse(text)
+        importHistoryRows(rows)
+    }
+
+    private suspend fun importHistoryRows(rows: List<HistoryCsvCodec.Row>): Int {
+        if (rows.isEmpty()) return 0
+
+        return db.withTransaction {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val sortedRows = rows.sortedWith(
+                compareBy<HistoryCsvCodec.Row> { it.timestamp }.thenBy { it.sourceIndex }
+            )
+            val groups = sortedRows.groupBy { row ->
+                listOf(
+                    row.trainNo,
+                    row.direction,
+                    dateFormat.format(Date(row.timestamp))
+                ).joinToString("\u001F")
+            }
+
+            var importedCount = 0
+
+            groups.values.forEach { group ->
+                val first = group.first()
+                val last = group.last()
+                val metadata = group.asReversed()
+
+                val trainRecordId = dao.insertTrainRecord(
+                    TrainRecord(
+                        trainNo = first.trainNo,
+                        direction = first.direction,
+                        locoModel = latestUseful(metadata) { it.locoModel } ?: first.locoModel,
+                        locoCode = latestUseful(metadata) { it.locoCode } ?: first.locoCode,
+                        route = latestUseful(metadata) { it.route } ?: first.route,
+                        category = latestUseful(metadata) { it.category } ?: first.category,
+                        firstSeenTime = first.timestamp,
+                        lastSeenTime = last.timestamp
+                    )
+                )
+
+                group.forEach { row ->
+                    dao.insertTrainSignalRecord(
+                        TrainSignalRecord(
+                            trainRecordId = trainRecordId,
+                            trainNo = row.trainNo,
+                            direction = row.direction,
+                            speed = row.speed,
+                            locoModel = row.locoModel,
+                            locoCode = row.locoCode,
+                            route = row.route,
+                            positionKm = row.positionKm,
+                            category = row.category,
+                            longitude = row.longitude,
+                            latitude = row.latitude,
+                            timestamp = row.timestamp
+                        )
+                    )
+                    importedCount++
+                }
+            }
+
+            importedCount
+        }
+    }
+
+    private fun latestUseful(
+        rows: List<HistoryCsvCodec.Row>,
+        selector: (HistoryCsvCodec.Row) -> String
+    ): String? {
+        return rows.asSequence()
+            .map(selector)
+            .firstOrNull { value ->
+                value.isNotBlank() &&
+                    value != "----" &&
+                    value != "---" &&
+                    value != "****" &&
+                    value != "未知"
+            }
     }
 
     fun clearHistory() {
