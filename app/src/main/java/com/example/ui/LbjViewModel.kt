@@ -1373,7 +1373,7 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         val text = if (utf8.contains("时间,车次,方向,速度")) {
             utf8
         } else {
-            bytes.toString(Charsets.forName("GB18030"))
+            bytes.toString(Charset.forName("GB18030"))
         }
         val rows = HistoryCsvCodec.parse(text)
         val importedCount = importHistoryRows(rows)
