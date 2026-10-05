@@ -57,7 +57,8 @@ private data class MapPoint(
 
 private data class MapViewportKey(
     val points: List<String>,
-    val selectedSignalId: Long?
+    val selectedSignalId: Long?,
+    val mapSignature: String
 )
 
 private class HistoryMapView(context: Context) : MapView(context) {
@@ -98,7 +99,8 @@ fun HistoryTrackMap(
             points = mapPoints.map {
                 "${it.signal.id}:${it.geoPoint.latitude}:${it.geoPoint.longitude}"
             },
-            selectedSignalId = selectedSignalId
+            selectedSignalId = selectedSignalId,
+            mapSignature = railwayMapSignature
         )
     }
     var lastViewportKey by remember { mutableStateOf<MapViewportKey?>(null) }
