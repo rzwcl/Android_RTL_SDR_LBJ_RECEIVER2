@@ -159,6 +159,7 @@ fun HistoryTrackMap(
                 mapView = view,
                 points = mapPoints,
                 railwayMapData = railwayMapData,
+                mapMode = mapMode,
                 selectedSignalId = selectedSignalId,
                 fitViewport = shouldFitViewport
             )
@@ -173,6 +174,7 @@ private fun renderHistoryTrack(
     mapView: MapView,
     points: List<MapPoint>,
     railwayMapData: RailwayMapData?,
+    mapMode: HistoryMapMode,
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
