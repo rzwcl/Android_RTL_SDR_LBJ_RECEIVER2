@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Speed
@@ -126,6 +128,20 @@ fun HistoryDetailScreen(
                 )
             }
 
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "列车详情 · " + record.trainNo,
+                    color = PrimaryBlueDark,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "共 " + signals.size + " 条 LBJ 信号记录",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+
             Box {
                 var mapMenuExpanded by remember { mutableStateOf(false) }
 
@@ -143,20 +159,20 @@ fun HistoryDetailScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = if (mapMode == HistoryMapMode.OSM) "OSM" else "ESRI",
                             color = if (mapMode == HistoryMapMode.OSM) TextPrimary else PrimaryBlueDark,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Icon(
                             imageVector = Icons.Default.ArrowDropDown,
                             contentDescription = "选择地图类型",
                             tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
@@ -181,22 +197,6 @@ fun HistoryDetailScreen(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.size(7.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "列车详情 · " + record.trainNo,
-                    color = PrimaryBlueDark,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "共 " + signals.size + " 条 LBJ 信号记录",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -209,7 +209,7 @@ fun HistoryDetailScreen(
             lastSeenText = timeFormat.format(Date(record.lastSeenTime))
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         val hasCoordinates = signals.any { hasSignalCoordinate(it) }
         val hasRailwayMapData = railwayMapData?.hasFeatures == true
@@ -217,7 +217,7 @@ fun HistoryDetailScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(292.dp)
+                    .height(360.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
                 shape = RoundedCornerShape(12.dp),
@@ -231,7 +231,7 @@ fun HistoryDetailScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
         if (signals.isEmpty()) {
             Spacer(modifier = Modifier.height(20.dp))
@@ -248,21 +248,49 @@ fun HistoryDetailScreen(
                 )
             }
         } else {
-            Text(
-                text = "历史公里标",
-                color = TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "历史公里标",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "左右滑动查看全部",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
 
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(signals, key = { it.id }) { signal ->
                     SignalRecordCard(
-                        modifier = Modifier.width(118.dp),
+                        modifier = Modifier.width(132.dp),
                         signal = signal,
                         timeText = timeFormat.format(Date(signal.timestamp)),
                         selected = signal.id == selectedSignalId,
@@ -281,9 +309,9 @@ fun HistoryDetailScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }
 
@@ -341,8 +369,8 @@ private fun HistorySummaryCard(
                 Text(
                     text = record.category,
                     color = PrimaryBlueDark,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -408,26 +436,27 @@ private fun DetailLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-             .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = PurpleTech,
-            modifier = Modifier.size(15.dp)
+            modifier = Modifier.size(17.dp)
         )
-        Spacer(modifier = Modifier.size(7.dp))
+        Spacer(modifier = Modifier.size(8.dp))
         Text(
             text = label + ": ",
             color = TextMuted,
-            fontSize = 13.sp
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
         )
         Text(
             text = value.ifBlank { "未知" },
             color = TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f)
         )
     }
@@ -477,12 +506,21 @@ private fun SignalRecordCard(
             Text(
                 text = signal.positionKm.ifBlank { "未解析" },
                 color = if (selected) PrimaryBlueDark else TextPrimary,
-                fontSize = 19.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "速度 " + signal.speed.ifBlank { "未知" } + " km/h",
+                color = if (selected) PrimaryBlueDark else TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = timeText.substringAfter(' '),
                 color = TextSecondary,
