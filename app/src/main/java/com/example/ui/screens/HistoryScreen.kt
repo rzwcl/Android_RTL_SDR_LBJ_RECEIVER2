@@ -191,7 +191,6 @@ fun HistoryScreen(
             }
         } else {
             val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-            val scrollbarScope = rememberCoroutineScope()
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = listState,
@@ -250,6 +249,7 @@ private fun HistoryScrollbar(
     listState: androidx.compose.foundation.lazy.LazyListState,
     modifier: Modifier = Modifier
 ) {
+    val scrollScope = rememberCoroutineScope()
     val layoutInfo = listState.layoutInfo
     val totalItems = layoutInfo.totalItemsCount
     val visibleItems = layoutInfo.visibleItemsInfo.size
@@ -291,7 +291,7 @@ private fun HistoryScrollbar(
                         val targetIndex = (
                             nextTop / maxTravelPx * maxFirstPosition
                         ).roundToInt().coerceIn(0, maxFirstPosition)
-                        scrollbarScope.launch { listState.scrollToItem(targetIndex) }
+                        scrollScope.launch { listState.scrollToItem(targetIndex) }
                     }
                 )
             }
