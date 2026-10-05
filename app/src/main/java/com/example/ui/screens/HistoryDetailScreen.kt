@@ -39,7 +39,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.layout.weight
 import androidx.compose.ui.unit.sp
 import com.example.data.TrainRecord
 import com.example.data.TrainSignalRecord
