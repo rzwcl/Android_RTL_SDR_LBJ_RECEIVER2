@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
@@ -37,6 +34,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,9 +94,12 @@ fun HistoryDetailScreen(
         durationSeconds.toString() + "秒"
     }
 
+    val pageScrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(pageScrollState)
             .padding(16.dp)
     ) {
         Row(
@@ -213,37 +215,47 @@ fun HistoryDetailScreen(
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 4.dp)
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(
-                    items = signals,
-                    key = { it.id }
-                ) { signal ->
-                    SignalRecordCard(
-                        signal = signal,
-                        timeText = timeFormat.format(Date(signal.timestamp)),
-                        selected = signal.id == selectedSignalId,
-                        onClick = {
-                            if (hasSignalCoordinate(signal)) {
-                                selectedSignalId = signal.id
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    "该公里标没有接收到经纬信息",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                signals.chunked(3).forEach { rowSignals ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowSignals.forEach { signal ->
+                            Box(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                SignalRecordCard(
+                                    signal = signal,
+                                    timeText = timeFormat.format(Date(signal.timestamp)),
+                                    selected = signal.id == selectedSignalId,
+                                    onClick = {
+                                        if (hasSignalCoordinate(signal)) {
+                                            selectedSignalId = signal.id
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "该公里标没有接收到经纬信息",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                )
                             }
                         }
-                    )
+
+                        repeat(3 - rowSignals.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
