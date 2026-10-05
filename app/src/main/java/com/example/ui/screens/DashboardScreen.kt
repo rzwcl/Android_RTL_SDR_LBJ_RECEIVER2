@@ -249,7 +249,17 @@ fun DashboardScreen(
                         }
 
                         OutlinedButton(
-                            onClick = onTestTcpConnection,
+                            onClick = {
+                                val port = tcpPortText.toIntOrNull()
+                                if (port == null || port !in 1..65535) {
+                                    tcpEndpointError = "请输入 1~65535 的有效端口"
+                                } else {
+                                    tcpEndpointError = onSetTcpEndpoint(tcpHostText, port)
+                                    if (tcpEndpointError == null) {
+                                        onTestTcpConnection()
+                                    }
+                                }
+                            },
                             enabled = !state.isRunning &&
                                 tcpHostText.trim().isNotEmpty() &&
                                 tcpPortText.toIntOrNull() in 1..65535,
