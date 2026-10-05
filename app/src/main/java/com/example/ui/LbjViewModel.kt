@@ -87,6 +87,8 @@ data class ReceiverState(
     val port: Int = 1234,
     val freqHz: Double = DspConstants.DEFAULT_FREQ_HZ,
     val gainDb: Float = DspConstants.HW_GAIN_DB,
+    val tunerAgc: Boolean = false,
+    val rtlAgc: Boolean = false,
     val ppm: Int = DspConstants.PPM,
     val dcOffsetHz: Double = DspConstants.DEFAULT_DC_OFFSET_HZ,
     val bwKhz: Double = DspConstants.DEFAULT_BW_KHZ,
@@ -155,6 +157,8 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
             port = if (prefs.connectionMode == "tcp") prefs.tcpPort else 1234,
             freqHz = prefs.freqHz,
             gainDb = prefs.gainDb,
+            tunerAgc = prefs.tunerAgc,
+            rtlAgc = prefs.rtlAgc,
             ppm = prefs.ppm,
             csThresholdDb = prefs.csThresholdDb,
             strictFilter = prefs.strictFilter,
@@ -217,6 +221,8 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         initialFreqHz = prefs.freqHz,
         dcOffsetHz = DspConstants.DEFAULT_DC_OFFSET_HZ,
         initialGainDb = prefs.gainDb,
+        initialTunerAgc = prefs.tunerAgc,
+        initialRtlAgc = prefs.rtlAgc,
         initialPpm = prefs.ppm
     )
 
@@ -1027,6 +1033,18 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         rtlClient.setGain(gainDb)
     }
 
+    fun setTunerAgc(enabled: Boolean) {
+        prefs.tunerAgc = enabled
+        _receiverState.value = _receiverState.value.copy(tunerAgc = enabled)
+        rtlClient.setTunerAgc(enabled)
+    }
+
+    fun setRtlAgc(enabled: Boolean) {
+        prefs.rtlAgc = enabled
+        _receiverState.value = _receiverState.value.copy(rtlAgc = enabled)
+        rtlClient.setRtlAgc(enabled)
+    }
+
     fun setPpm(ppm: Int) {
         prefs.ppm = ppm
         _receiverState.value = _receiverState.value.copy(ppm = ppm)
@@ -1192,6 +1210,8 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         setFrequency(DspConstants.DEFAULT_FREQ_HZ / 1_000_000.0)
+        setTunerAgc(false)
+        setRtlAgc(false)
         setGain(DspConstants.HW_GAIN_DB)
         setPpm(DspConstants.PPM)
         setCsThreshold(DspConstants.DEFAULT_RSSI_THRESHOLD_DB)
