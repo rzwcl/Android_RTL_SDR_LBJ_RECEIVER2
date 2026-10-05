@@ -81,8 +81,6 @@ fun SettingsScreen(
     state: ReceiverState,
     onOpenFreqDialog: () -> Unit,
     onOpenGainDialog: () -> Unit,
-    onToggleTunerAgc: (Boolean) -> Unit = {},
-    onToggleRtlAgc: (Boolean) -> Unit = {},
     onOpenPpmDialog: () -> Unit,
     onOpenCsDialog: () -> Unit,
     onOpenWatchlistDialog: () -> Unit,
@@ -407,24 +405,23 @@ fun SettingsScreen(
                     value = String.format(Locale.US, "%.4f MHz", state.freqHz / 1_000_000.0),
                     onClick = onOpenFreqDialog
                 )
-                SettingsSwitchItem(
-                    title = "Tuner AGC",
-                    subtitle = "由 RTL-SDR 调谐器自动控制模拟前端增益；开启后手动增益不可用",
-                    checked = state.tunerAgc,
-                    onCheckedChange = onToggleTunerAgc
-                )
-                SettingsSwitchItem(
-                    title = "RTL AGC",
-                    subtitle = "由 RTL2832U 数字端自动控制 AGC",
-                    checked = state.rtlAgc,
-                    onCheckedChange = onToggleRtlAgc
-                )
                 SettingsItem(
                     title = "硬件增益 (R820T Gain)",
-                    subtitle = if (state.tunerAgc) "Tuner AGC 已开启，手动增益暂不可用" else "调节接收灵敏度与信噪比 (默认: 15.7 dB)",
+                    subtitle = if (state.tunerAgc) "Tuner AGC 已开启，点击这里只提示，不会进入手动增益设置" else "调节接收灵敏度与信噪比 (默认: 15.7 dB)",
                     value = if (state.tunerAgc) "自动" else String.format(Locale.US, "%.1f dB", state.gainDb),
-                    onClick = onOpenGainDialog,
-                    enabled = !state.tunerAgc
+                    onClick = {
+                        if (state.tunerAgc) {
+                            Toast.makeText(
+                                context,
+                                "Tuner AGC 已开启，当前由调谐器自动控制硬件增益；请先关闭 Tuner AGC",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            onOpenGainDialog()
+                        }
+                    },
+                    enabled = true,
+                    visualEnabled = !state.tunerAgc
                 )
                 SettingsItem(
                     title = "PPM 晶振频偏校准",
@@ -662,11 +659,12 @@ fun SettingsItem(
     subtitle: String,
     value: String,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    visualEnabled: Boolean = enabled
 ) {
-    val primaryColor = if (enabled) TextPrimary else TextSecondary
-    val secondaryColor = if (enabled) TextSecondary else TextSecondary.copy(alpha = 0.55f)
-    val valueColor = if (enabled) PrimaryBlueDark else TextSecondary.copy(alpha = 0.55f)
+    val primaryColor = if (visualEnabled) TextPrimary else TextSecondary
+    val secondaryColor = if (visualEnabled) TextSecondary else TextSecondary.copy(alpha = 0.55f)
+    val valueColor = if (visualEnabled) PrimaryBlueDark else TextSecondary.copy(alpha = 0.55f)
 
     Row(
         modifier = Modifier
