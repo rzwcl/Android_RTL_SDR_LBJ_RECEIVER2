@@ -102,6 +102,7 @@ fun DashboardScreen(
     onStopReceiver: () -> Unit,
     onSetConnectionMode: (ReceiverConnectionMode) -> Unit = {},
     onSetTcpEndpoint: (String, Int) -> String? = { _, _ -> null },
+    onTestTcpConnection: () -> Unit = {},
     onLaunchDriver: () -> Unit,
     onClearTelemetry: () -> Unit,
     onOpenFreqDialog: () -> Unit,
@@ -235,6 +236,13 @@ fun DashboardScreen(
                             }
                         ) {
                             Text("应用", fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = onTestTcpConnection,
+                            enabled = !state.isRunning && tcpHostText.trim().isNotEmpty() && tcpPortText.toIntOrNull() != null,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Text("测试连接", fontSize = 12.sp)
                         }
                     }
                     tcpEndpointError?.let {
