@@ -5,8 +5,11 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Point
+import android.graphics.RectF
+import android.graphics.Path
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import android.graphics.PixelFormat
+import android.graphics.drawable.Drawable
 import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.compose.runtime.Composable
@@ -198,12 +201,20 @@ private class RailwayLabelOverlay(
         style = Paint.Style.STROKE
     }
 
+    private val textStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.BLACK
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
         style = Paint.Style.FILL
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         textAlign = Paint.Align.CENTER
-        setShadowLayer(3f, 0f, 0f, AndroidColor.BLACK)
     }
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
@@ -218,12 +229,15 @@ private class RailwayLabelOverlay(
         if (zoom < 9.0) return
 
         val textSizeDp = when {
-            zoom >= 15.0 -> 13f
-            zoom >= 13.0 -> 12f
-            zoom >= 11.0 -> 11f
-            else -> 10f
+            zoom >= 15.0 -> 14f
+            zoom >= 13.0 -> 13f
+            zoom >= 11.0 -> 12f
+            else -> 11f
         }
-        textPaint.textSize = textSizeDp * mapView.resources.displayMetrics.density
+        val density = mapView.resources.displayMetrics.density
+        textPaint.textSize = textSizeDp * density
+        textStrokePaint.textSize = textPaint.textSize
+        textStrokePaint.strokeWidth = 3.2f * density
 
         val minLineLengthKm = when {
             zoom >= 15.0 -> 0.15
@@ -285,9 +299,11 @@ private class RailwayLabelOverlay(
                     return@forEach
                 }
 
+                val baseline = y - 5f * density
                 canvas.save()
                 canvas.rotate(angle, x, y)
-                canvas.drawText(name, x, y - 4f * mapView.resources.displayMetrics.density, textPaint)
+                canvas.drawText(name, x, baseline, textStrokePaint)
+                canvas.drawText(name, x, baseline, textPaint)
                 canvas.restore()
             }
 
@@ -307,10 +323,12 @@ private class RailwayLabelOverlay(
         }
 
         textPaint.textSize = when {
-            zoom >= 15.0 -> 13f * density
-            zoom >= 13.0 -> 12f * density
-            else -> 11f * density
+            zoom >= 15.0 -> 14f * density
+            zoom >= 13.0 -> 13f * density
+            else -> 12f * density
         }
+        textStrokePaint.textSize = textPaint.textSize
+        textStrokePaint.strokeWidth = 3.0f * density
 
         data.stations.forEachIndexed { index, station ->
             // At smaller zooms, keep the station layer sparse instead of drawing every point.
@@ -326,12 +344,10 @@ private class RailwayLabelOverlay(
             canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius, stationPaint)
 
             if (shouldDrawNames && station.name.isNotBlank()) {
-                canvas.drawText(
-                    station.name,
-                    point.x.toFloat(),
-                    point.y.toFloat() - radius - 4f * density,
-                    textPaint
-                )
+                val textX = point.x.toFloat()
+                val textY = point.y.toFloat() - radius - 5f * density
+                canvas.drawText(station.name, textX, textY, textStrokePaint)
+                canvas.drawText(station.name, textX, textY, textPaint)
             }
         }
     }
@@ -449,12 +465,17 @@ private fun renderHistoryTrack(
         mapView.overlays.add(RailwayLabelOverlay(mapView, railwayMapData))
     }
 
-    val markerPoint = selectedPoint ?: points.lastOrNull()
+    val markerIndex = selectedPoint?.let { selected ->
+        points.indexOfFirst { it.signal.id == selected.signal.id }
+    }?.takeIf { it >= 0 } ?: points.lastIndex
+
+    val markerPoint = points.getOrNull(markerIndex)
     if (markerPoint != null) {
         val marker = Marker(mapView).apply {
             position = markerPoint.geoPoint
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = createTrainMarkerDrawable(mapView)
+            rotation = calculateTrainBearing(points, markerIndex)
             setInfoWindow(null)
         }
         mapView.overlays.add(marker)
@@ -472,16 +493,129 @@ private fun withOpacity(color: Int, opacity: Float): Int {
         AndroidColor.blue(color)
     )
 }
-private fun createTrainMarkerDrawable(mapView: MapView): GradientDrawable {
-    val density = mapView.resources.displayMetrics.density
-    return GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
-        setColor(AndroidColor.BLACK)
-        setStroke(max(1, (1.5f * density).toInt()), AndroidColor.WHITE)
-        setSize(
-            (24f * density).toInt(),
-            (24f * density).toInt()
+private fun createTrainMarkerDrawable(mapView: MapView): Drawable {
+    return TrainMarkerDrawable(mapView.resources.displayMetrics.density)
+}
+
+private class TrainMarkerDrawable(
+    private val density: Float
+) : Drawable() {
+
+    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        style = Paint.Style.FILL
+    }
+
+    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.BLACK
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * density
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    private val windowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.rgb(45, 55, 65)
+        style = Paint.Style.FILL
+    }
+
+    private val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.rgb(55, 105, 190)
+        style = Paint.Style.FILL
+    }
+
+    private val wheelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.BLACK
+        style = Paint.Style.FILL
+    }
+
+    override fun draw(canvas: Canvas) {
+        val cx = bounds.exactCenterX()
+        val top = bounds.top.toFloat()
+        val bottom = bounds.bottom.toFloat()
+        val halfWidth = bounds.width() * 0.31f
+        val bodyTop = top + 2f * density
+        val bodyBottom = bottom - 2f * density
+
+        val body = Path().apply {
+            moveTo(cx, bodyTop)
+            cubicTo(
+                cx - halfWidth * 0.65f, bodyTop + 3f * density,
+                cx - halfWidth, bodyTop + 8f * density,
+                cx - halfWidth, bodyTop + 12f * density
+            )
+            lineTo(cx - halfWidth, bodyBottom - 7f * density)
+            quadraticTo(cx - halfWidth, bodyBottom, cx - halfWidth * 0.55f, bodyBottom)
+            lineTo(cx + halfWidth * 0.55f, bodyBottom)
+            quadraticTo(cx + halfWidth, bodyBottom, cx + halfWidth, bodyBottom - 7f * density)
+            lineTo(cx + halfWidth, bodyTop + 12f * density)
+            cubicTo(
+                cx + halfWidth, bodyTop + 8f * density,
+                cx + halfWidth * 0.65f, bodyTop + 3f * density,
+                cx, bodyTop
+            )
+            close()
+        }
+
+        canvas.drawPath(body, bodyPaint)
+        canvas.drawPath(body, outlinePaint)
+
+        val windowWidth = halfWidth * 1.25f
+        val windowRect = RectF(
+            cx - windowWidth / 2f,
+            bodyTop + 10f * density,
+            cx + windowWidth / 2f,
+            bodyTop + 16f * density
         )
+        canvas.drawRoundRect(windowRect, 2f * density, 2f * density, windowPaint)
+
+        val roofRect = RectF(
+            cx - halfWidth * 0.72f,
+            bodyTop + 19f * density,
+            cx + halfWidth * 0.72f,
+            bodyTop + 22f * density
+        )
+        canvas.drawRoundRect(roofRect, 1.5f * density, 1.5f * density, accentPaint)
+
+        val wheelRadius = 2.0f * density
+        val wheelY = bodyBottom - 5f * density
+        canvas.drawCircle(cx - halfWidth - 1.5f * density, wheelY, wheelRadius, wheelPaint)
+        canvas.drawCircle(cx + halfWidth + 1.5f * density, wheelY, wheelRadius, wheelPaint)
+    }
+
+    override fun getIntrinsicWidth(): Int = (34f * density).roundToInt()
+    override fun getIntrinsicHeight(): Int = (48f * density).roundToInt()
+
+    override fun setAlpha(alpha: Int) {
+        bodyPaint.alpha = alpha
+        outlinePaint.alpha = alpha
+        windowPaint.alpha = alpha
+        accentPaint.alpha = alpha
+        wheelPaint.alpha = alpha
+    }
+
+    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+        bodyPaint.colorFilter = colorFilter
+        outlinePaint.colorFilter = colorFilter
+        windowPaint.colorFilter = colorFilter
+        accentPaint.colorFilter = colorFilter
+        wheelPaint.colorFilter = colorFilter
+    }
+
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+}
+
+private fun calculateTrainBearing(
+    points: List<MapPoint>,
+    markerIndex: Int
+): Float {
+    if (points.size < 2) return 0f
+
+    return when {
+        markerIndex < points.lastIndex ->
+            points[markerIndex].geoPoint.bearingTo(points[markerIndex + 1].geoPoint)
+        markerIndex > 0 ->
+            points[markerIndex - 1].geoPoint.bearingTo(points[markerIndex].geoPoint)
+        else -> 0f
     }
 }
 
