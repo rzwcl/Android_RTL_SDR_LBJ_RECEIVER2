@@ -143,6 +143,8 @@ fun MainScreen(viewModel: LbjViewModel) {
         }
     }
 
+    var pendingDailyCsvExportName by remember { mutableStateOf<String?>(null) }
+
     val dailyCsvExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -207,7 +209,6 @@ fun MainScreen(viewModel: LbjViewModel) {
     var showLocomotiveLibrary by remember { mutableStateOf(false) }
     var showDailyCsv by remember { mutableStateOf(false) }
     var dailyCsvFiles by remember { mutableStateOf(viewModel.getDailyCsvFiles()) }
-    var pendingDailyCsvExportName by remember { mutableStateOf<String?>(null) }
 
     val locomotiveLibraryEntries by viewModel.locomotiveLibraryEntries.collectAsState()
     val locomotiveLibrarySource by viewModel.locomotiveLibrarySource.collectAsState()
