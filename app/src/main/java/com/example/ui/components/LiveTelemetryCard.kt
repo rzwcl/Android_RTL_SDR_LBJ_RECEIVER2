@@ -384,6 +384,74 @@ fun LiveTelemetryCard(
                 }
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Row 4: LBJ 经纬度
+            val longitudeText = telemetry.longitude.ifBlank { "---" }
+            val latitudeText = telemetry.latitude.ifBlank { "---" }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceSecondary, RoundedCornerShape(10.dp))
+                    .border(1.dp, BorderLight, RoundedCornerShape(10.dp))
+                    .padding(12.dp)
+                    .testTag("coordinates_card")
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Navigation,
+                            contentDescription = "经纬度",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                        Text(
+                            text = "经纬度",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "经度",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = longitudeText,
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "纬度",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = latitudeText,
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             // Station Arrival & ETA Monitor Section
