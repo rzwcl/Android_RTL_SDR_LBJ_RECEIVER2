@@ -18,9 +18,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.ui.theme.SurfaceCard
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -33,9 +47,7 @@ import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.infowindow.InfoWindow
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
@@ -134,6 +146,7 @@ fun HistoryTrackMap(
         HistoryMapView(context).apply {
             setTileSource(if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource)
             setMultiTouchControls(true)
+            setBuiltInZoomControls(false)
             setUseDataConnection(true)
             minZoomLevel = 2.0
             maxZoomLevel = 18.0
@@ -162,24 +175,57 @@ fun HistoryTrackMap(
         }
     }
 
-    AndroidView(
-        factory = { mapView },
-        modifier = modifier,
-        update = { view ->
-            val shouldFitViewport = viewportKey != lastViewportKey
-            renderHistoryTrack(
-                mapView = view,
-                points = mapPoints,
-                railwayMapData = railwayMapData,
-                mapMode = mapMode,
-                selectedSignalId = selectedSignalId,
-                fitViewport = shouldFitViewport
-            )
-            if (shouldFitViewport) {
-                lastViewportKey = viewportKey
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { mapView },
+            modifier = Modifier.fillMaxSize(),
+            update = { view ->
+                val shouldFitViewport = viewportKey != lastViewportKey
+                renderHistoryTrack(
+                    mapView = view,
+                    points = mapPoints,
+                    railwayMapData = railwayMapData,
+                    mapMode = mapMode,
+                    selectedSignalId = selectedSignalId,
+                    fitViewport = shouldFitViewport
+                )
+                if (shouldFitViewport) {
+                    lastViewportKey = viewportKey
+                }
+            }
+        )
+
+        Card(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 8.dp, bottom = 8.dp),
+            shape = RoundedCornerShape(7.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard.copy(alpha = 0.92f))
+        ) {
+            Column {
+                IconButton(
+                    onClick = { mapView.controller.zoomIn() },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "放大地图",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { mapView.controller.zoomOut() },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "缩小地图",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
-    )
+    }
 }
 
 
@@ -395,7 +441,6 @@ private fun renderHistoryTrack(
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
-    InfoWindow.closeAllInfoWindowsOn(mapView)
     mapView.setTileSource(
         if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource
     )
@@ -471,14 +516,13 @@ private fun renderHistoryTrack(
 
     val markerPoint = points.getOrNull(markerIndex)
     if (markerPoint != null) {
-        val marker = Marker(mapView).apply {
-            position = markerPoint.geoPoint
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            icon = createTrainMarkerDrawable(mapView)
-            rotation = calculateTrainBearing(points, markerIndex)
-            setInfoWindow(null)
-        }
-        mapView.overlays.add(marker)
+        mapView.overlays.add(
+            TrainPositionOverlay(
+                mapView = mapView,
+                point = markerPoint.geoPoint,
+                angle = calculateScreenTrainAngle(mapView, points, markerIndex)
+            )
+        )
     }
 
     mapView.invalidate()
@@ -493,13 +537,11 @@ private fun withOpacity(color: Int, opacity: Float): Int {
         AndroidColor.blue(color)
     )
 }
-private fun createTrainMarkerDrawable(mapView: MapView): Drawable {
-    return TrainMarkerDrawable(mapView.resources.displayMetrics.density)
-}
-
-private class TrainMarkerDrawable(
-    private val density: Float
-) : Drawable() {
+private class TrainPositionOverlay(
+    private val mapView: MapView,
+    private val geoPoint: GeoPoint,
+    private val angle: Float
+) : org.osmdroid.views.overlay.Overlay() {
 
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
@@ -509,7 +551,7 @@ private class TrainMarkerDrawable(
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.BLACK
         style = Paint.Style.STROKE
-        strokeWidth = 2.2f * density
+        strokeWidth = 2.0f * mapView.resources.displayMetrics.density
         strokeJoin = Paint.Join.ROUND
     }
 
@@ -523,35 +565,38 @@ private class TrainMarkerDrawable(
         style = Paint.Style.FILL
     }
 
-    private val wheelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.BLACK
-        style = Paint.Style.FILL
-    }
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
 
-    override fun draw(canvas: Canvas) {
-        val cx = bounds.exactCenterX()
-        val top = bounds.top.toFloat()
-        val bottom = bounds.bottom.toFloat()
-        val halfWidth = bounds.width() * 0.31f
-        val bodyTop = top + 2f * density
-        val bodyBottom = bottom - 2f * density
+        val density = mapView.resources.displayMetrics.density
+        val point = mapView.projection.toPixels(geoPoint, Point())
+        val centerX = point.x.toFloat()
+        val centerY = point.y.toFloat()
+
+        canvas.save()
+        canvas.rotate(angle, centerX, centerY)
+
+        val halfWidth = 9f * density
+        val halfHeight = 16f * density
+        val top = centerY - halfHeight
+        val bottom = centerY + halfHeight
 
         val body = Path().apply {
-            moveTo(cx, bodyTop)
+            moveTo(centerX, top)
             cubicTo(
-                cx - halfWidth * 0.65f, bodyTop + 3f * density,
-                cx - halfWidth, bodyTop + 8f * density,
-                cx - halfWidth, bodyTop + 12f * density
+                centerX - 5f * density, top + 2f * density,
+                centerX - halfWidth, top + 6f * density,
+                centerX - halfWidth, top + 10f * density
             )
-            lineTo(cx - halfWidth, bodyBottom - 7f * density)
-            quadTo(cx - halfWidth, bodyBottom, cx - halfWidth * 0.55f, bodyBottom)
-            lineTo(cx + halfWidth * 0.55f, bodyBottom)
-            quadTo(cx + halfWidth, bodyBottom, cx + halfWidth, bodyBottom - 7f * density)
-            lineTo(cx + halfWidth, bodyTop + 12f * density)
+            lineTo(centerX - halfWidth, bottom - 4f * density)
+            quadraticTo(centerX - halfWidth, bottom, centerX - 5f * density, bottom)
+            lineTo(centerX + 5f * density, bottom)
+            quadraticTo(centerX + halfWidth, bottom, centerX + halfWidth, bottom - 4f * density)
+            lineTo(centerX + halfWidth, top + 10f * density)
             cubicTo(
-                cx + halfWidth, bodyTop + 8f * density,
-                cx + halfWidth * 0.65f, bodyTop + 3f * density,
-                cx, bodyTop
+                centerX + halfWidth, top + 6f * density,
+                centerX + 5f * density, top + 2f * density,
+                centerX, top
             )
             close()
         }
@@ -559,64 +604,65 @@ private class TrainMarkerDrawable(
         canvas.drawPath(body, bodyPaint)
         canvas.drawPath(body, outlinePaint)
 
-        val windowWidth = halfWidth * 1.25f
-        val windowRect = RectF(
-            cx - windowWidth / 2f,
-            bodyTop + 10f * density,
-            cx + windowWidth / 2f,
-            bodyTop + 16f * density
+        canvas.drawRoundRect(
+            RectF(
+                centerX - 5.2f * density,
+                top + 7f * density,
+                centerX + 5.2f * density,
+                top + 12f * density
+            ),
+            1.5f * density,
+            1.5f * density,
+            windowPaint
         )
-        canvas.drawRoundRect(windowRect, 2f * density, 2f * density, windowPaint)
 
-        val roofRect = RectF(
-            cx - halfWidth * 0.72f,
-            bodyTop + 19f * density,
-            cx + halfWidth * 0.72f,
-            bodyTop + 22f * density
+        canvas.drawRoundRect(
+            RectF(
+                centerX - 6.5f * density,
+                top + 14f * density,
+                centerX + 6.5f * density,
+                top + 16.5f * density
+            ),
+            1.0f * density,
+            1.0f * density,
+            accentPaint
         )
-        canvas.drawRoundRect(roofRect, 1.5f * density, 1.5f * density, accentPaint)
 
-        val wheelRadius = 2.0f * density
-        val wheelY = bodyBottom - 5f * density
-        canvas.drawCircle(cx - halfWidth - 1.5f * density, wheelY, wheelRadius, wheelPaint)
-        canvas.drawCircle(cx + halfWidth + 1.5f * density, wheelY, wheelRadius, wheelPaint)
+        canvas.restore()
     }
 
-    override fun getIntrinsicWidth(): Int = (34f * density).roundToInt()
-    override fun getIntrinsicHeight(): Int = (48f * density).roundToInt()
-
-    override fun setAlpha(alpha: Int) {
-        bodyPaint.alpha = alpha
-        outlinePaint.alpha = alpha
-        windowPaint.alpha = alpha
-        accentPaint.alpha = alpha
-        wheelPaint.alpha = alpha
+    override fun onSingleTapConfirmed(
+        e: MotionEvent?,
+        mapView: MapView?
+    ): Boolean {
+        return true
     }
-
-    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-        bodyPaint.colorFilter = colorFilter
-        outlinePaint.colorFilter = colorFilter
-        windowPaint.colorFilter = colorFilter
-        accentPaint.colorFilter = colorFilter
-        wheelPaint.colorFilter = colorFilter
-    }
-
-    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 }
 
-private fun calculateTrainBearing(
+private fun calculateScreenTrainAngle(
+    mapView: MapView,
     points: List<MapPoint>,
     markerIndex: Int
 ): Float {
     if (points.size < 2) return 0f
 
-    return when {
-        markerIndex < points.lastIndex ->
-            points[markerIndex].geoPoint.bearingTo(points[markerIndex + 1].geoPoint).toFloat()
-        markerIndex > 0 ->
-            points[markerIndex - 1].geoPoint.bearingTo(points[markerIndex].geoPoint).toFloat()
-        else -> 0f
+    val target = points[markerIndex].geoPoint
+    val neighbor = when {
+        markerIndex < points.lastIndex -> points[markerIndex + 1].geoPoint
+        markerIndex > 0 -> points[markerIndex - 1].geoPoint
+        else -> target
     }
+
+    if (target == neighbor) return 0f
+
+    val a = mapView.projection.toPixels(target, Point())
+    val b = mapView.projection.toPixels(neighbor, Point())
+    val dx = (b.x - a.x).toFloat()
+    val dy = (b.y - a.y).toFloat()
+
+    if (dx == 0f && dy == 0f) return 0f
+
+    return (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f) % 360f
 }
 
 private fun buildMarkerSnippet(signal: TrainSignalRecord): String {
