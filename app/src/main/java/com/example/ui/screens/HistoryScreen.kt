@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import com.example.data.TrainRecord
 import com.example.ui.theme.BlueUp
 import com.example.ui.theme.BlueUpSoft
@@ -274,6 +275,7 @@ private fun HistoryScrollbar(
         ((firstVisible?.offset ?: 0) / averageItemHeightPx)
     val progress = (firstPosition / maxFirstPosition).coerceIn(0f, 1f)
     val thumbTopPx = (maxTravelPx * progress).roundToInt()
+    val scrollScope = rememberCoroutineScope()
 
     Box(
         modifier = modifier
@@ -282,7 +284,7 @@ private fun HistoryScrollbar(
             .pointerInput(totalItems, visibleItems, trackHeightPx, thumbHeightPx) {
                 var dragStartTopPx = thumbTopPx.toFloat()
                 var accumulatedDragPx = 0f
-                var dragScrollJob: kotlinx.coroutines.Job? = null
+                var dragScrollJob: Job? = null
 
                 detectDragGestures(
                     onDragStart = {
@@ -304,10 +306,8 @@ private fun HistoryScrollbar(
                             .coerceIn(0, maxFirstPosition)
 
                         dragScrollJob?.cancel()
-                        dragScrollJob = kotlinx.coroutines.coroutineScope {
-                            launch {
-                                listState.scrollToItem(targetIndex)
-                            }
+                        dragScrollJob = scrollScope.launch {
+                            listState.scrollToItem(targetIndex)
                         }
                     },
                     onDragEnd = {
