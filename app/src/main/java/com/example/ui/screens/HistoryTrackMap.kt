@@ -9,7 +9,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -97,12 +96,15 @@ private fun renderHistoryTrack(
     }
 
     val geoPoints = points.map { it.geoPoint }
+    val uniqueGeoPoints = geoPoints.distinctBy { point ->
+        point.latitude.toString() + "," + point.longitude.toString()
+    }
 
-    if (geoPoints.size == 1) {
+    if (uniqueGeoPoints.size <= 1) {
         mapView.controller.setCenter(geoPoints.first())
         mapView.controller.setZoom(17.0)
     } else {
-        val bounds = BoundingBox.fromGeoPoints(geoPoints)
+        val bounds = BoundingBox.fromGeoPoints(uniqueGeoPoints)
         mapView.controller.setCenter(bounds.center)
         mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
         val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
