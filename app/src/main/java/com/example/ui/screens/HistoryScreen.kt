@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import com.example.data.TrainRecord
 import com.example.ui.theme.BlueUp
 import com.example.ui.theme.BlueUpSoft
