@@ -332,6 +332,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onStopReceiver = { viewModel.stopReceiver() },
                 onSetConnectionMode = { viewModel.setConnectionMode(it) },
                 onSetTcpEndpoint = { host, port -> viewModel.setTcpEndpoint(host, port) },
+                onTestTcpConnection = { viewModel.testTcpConnection() },
                 onLaunchDriver = { viewModel.launchAndroidDriver() },
                 onClearTelemetry = { viewModel.clearLiveTelemetry() },
                 onOpenFreqDialog = { showFreqDialog = true },
