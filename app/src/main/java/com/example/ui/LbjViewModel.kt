@@ -29,6 +29,7 @@ import com.example.util.SoundAlertManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -1108,9 +1109,16 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         _receiverState.value = _receiverState.value.copy(warningMessage = "")
     }
 
+    fun getTrainSignalRecords(trainRecordId: Long): Flow<List<TrainSignalRecord>> {
+        return dao.getTrainSignalRecords(trainRecordId)
+    }
+
     fun clearHistory() {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.clearAllTrainRecords()
+            trainDbMutex.withLock {
+                dao.clearAllTrainSignalRecords()
+                dao.clearAllTrainRecords()
+            }
         }
         activeTrainRecordId = null
         activeTrainNo = null
@@ -1118,7 +1126,10 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteHistoryRecord(id: Long) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.deleteTrainRecord(id)
+            trainDbMutex.withLock {
+                dao.deleteTrainSignalRecords(id)
+                dao.deleteTrainRecord(id)
+            }
         }
         if (activeTrainRecordId == id) {
             activeTrainRecordId = null
