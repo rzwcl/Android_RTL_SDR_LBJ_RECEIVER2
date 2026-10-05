@@ -14,13 +14,40 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.TrainSignalRecord
 import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.max
+
+enum class HistoryMapSource {
+    OSM,
+    ESRI_WORLD_IMAGERY
+}
+
+private val EsriWorldImageryTileSource = object : OnlineTileSourceBase(
+    "ESRI World Imagery",
+    0,
+    19,
+    256,
+    ".jpg",
+    arrayOf(
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
+    ),
+    "Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        return getBaseUrl() +
+            MapTileIndex.getZoom(pMapTileIndex) + "/" +
+            MapTileIndex.getY(pMapTileIndex) + "/" +
+            MapTileIndex.getX(pMapTileIndex) +
+            mImageFilenameEnding
+    }
+}
 
 private data class MapPoint(
     val signal: TrainSignalRecord,
@@ -30,6 +57,7 @@ private data class MapPoint(
 @Composable
 fun HistoryTrackMap(
     signals: List<TrainSignalRecord>,
+    mapSource: HistoryMapSource = HistoryMapSource.OSM,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -79,15 +107,22 @@ fun HistoryTrackMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            renderHistoryTrack(view, mapPoints)
+            renderHistoryTrack(view, mapPoints, mapSource)
         }
     )
 }
 
 private fun renderHistoryTrack(
     mapView: MapView,
-    points: List<MapPoint>
+    points: List<MapPoint>,
+    mapSource: HistoryMapSource
 ) {
+    mapView.setTileSource(
+        when (mapSource) {
+            HistoryMapSource.OSM -> TileSourceFactory.MAPNIK
+            HistoryMapSource.ESRI_WORLD_IMAGERY -> EsriWorldImageryTileSource
+        }
+    )
     mapView.overlays.clear()
 
     if (points.isEmpty()) {
