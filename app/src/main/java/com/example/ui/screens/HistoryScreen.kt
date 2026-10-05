@@ -282,11 +282,13 @@ private fun HistoryScrollbar(
             .pointerInput(totalItems, visibleItems, trackHeightPx, thumbHeightPx) {
                 var dragStartTopPx = thumbTopPx.toFloat()
                 var accumulatedDragPx = 0f
+                var dragScrollJob: kotlinx.coroutines.Job? = null
 
                 detectDragGestures(
                     onDragStart = {
                         dragStartTopPx = thumbTopPx.toFloat()
                         accumulatedDragPx = 0f
+                        dragScrollJob?.cancel()
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
@@ -301,7 +303,20 @@ private fun HistoryScrollbar(
                             .roundToInt()
                             .coerceIn(0, maxFirstPosition)
 
-                        listState.scrollToItem(targetIndex)
+                        dragScrollJob?.cancel()
+                        dragScrollJob = kotlinx.coroutines.coroutineScope {
+                            launch {
+                                listState.scrollToItem(targetIndex)
+                            }
+                        }
+                    },
+                    onDragEnd = {
+                        dragScrollJob?.cancel()
+                        dragScrollJob = null
+                    },
+                    onDragCancel = {
+                        dragScrollJob?.cancel()
+                        dragScrollJob = null
                     }
                 )
             },
