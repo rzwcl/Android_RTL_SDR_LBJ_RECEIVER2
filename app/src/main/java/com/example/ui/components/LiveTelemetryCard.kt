@@ -336,7 +336,8 @@ fun LiveTelemetryCard(
             val milestoneStr = if (parsedKm != null) " (${ArrivalEstimator.formatMilestone(parsedKm)})" else ""
             val routeText = if (telemetry.route != "----") telemetry.route else "----"
             val directionText = telemetry.direction
-            val kmText = if (telemetry.positionKm != "---.-") "${telemetry.positionKm} KM$milestoneStr" else "---.- KM"
+            val normalizedPositionKm = ArrivalEstimator.normalizePositionKm(telemetry.positionKm)
+            val kmText = if (normalizedPositionKm != "---.-") normalizedPositionKm + " KM" + milestoneStr else "---.- KM"
             val mergedDisplay = "$routeText - $directionText - $kmText"
 
             Box(
