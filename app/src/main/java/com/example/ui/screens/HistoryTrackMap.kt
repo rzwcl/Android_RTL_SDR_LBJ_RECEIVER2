@@ -18,6 +18,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.TrainSignalRecord
+import com.example.util.RailwayMapData
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -28,11 +29,6 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.max
-
-enum class HistoryMapSource {
-    OSM,
-    ESRI_WORLD_IMAGERY
-}
 
 private val EsriWorldImageryTileSource = object : OnlineTileSourceBase(
     "ESRI World Imagery",
@@ -82,7 +78,7 @@ private class HistoryMapView(context: Context) : MapView(context) {
 @Composable
 fun HistoryTrackMap(
     signals: List<TrainSignalRecord>,
-    mapSource: HistoryMapSource = HistoryMapSource.OSM,
+    railwayMapData: RailwayMapData? = null,
     selectedSignalId: Long? = null,
     modifier: Modifier = Modifier
 ) {
@@ -96,7 +92,8 @@ fun HistoryTrackMap(
             }
         }
     }
-    val viewportKey = remember(mapPoints, selectedSignalId) {
+    val railwayMapSignature = railwayMapData?.let { it.fileName + ":" + it.lines.size + ":" + it.stations.size } ?: ""
+    val viewportKey = remember(mapPoints, selectedSignalId, railwayMapSignature) {
         MapViewportKey(
             points = mapPoints.map {
                 "${it.signal.id}:${it.geoPoint.latitude}:${it.geoPoint.longitude}"
@@ -114,7 +111,7 @@ fun HistoryTrackMap(
         Configuration.getInstance().userAgentValue =
             "SDR-LBJ/1.1.2 (" + context.packageName + ")"
         HistoryMapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(EsriWorldImageryTileSource)
             setMultiTouchControls(true)
             setUseDataConnection(true)
             minZoomLevel = 2.0
@@ -152,7 +149,7 @@ fun HistoryTrackMap(
             renderHistoryTrack(
                 mapView = view,
                 points = mapPoints,
-                mapSource = mapSource,
+                railwayMapData = railwayMapData,
                 selectedSignalId = selectedSignalId,
                 fitViewport = shouldFitViewport
             )
@@ -166,22 +163,12 @@ fun HistoryTrackMap(
 private fun renderHistoryTrack(
     mapView: MapView,
     points: List<MapPoint>,
-    mapSource: HistoryMapSource,
+    railwayMapData: RailwayMapData?,
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
-    mapView.setTileSource(
-        when (mapSource) {
-            HistoryMapSource.OSM -> TileSourceFactory.MAPNIK
-            HistoryMapSource.ESRI_WORLD_IMAGERY -> EsriWorldImageryTileSource
-        }
-    )
+    mapView.setTileSource(EsriWorldImageryTileSource)
     mapView.overlays.clear()
-
-    if (points.isEmpty()) {
-        mapView.invalidate()
-        return
-    }
 
     val geoPoints = points.map { it.geoPoint }
     val uniqueGeoPoints = geoPoints.distinctBy { point ->
@@ -191,18 +178,25 @@ private fun renderHistoryTrack(
         points.firstOrNull { it.signal.id == signalId }
     }
 
+    val mapLinePoints = railwayMapData?.lines?.flatMap { it.points }.orEmpty()
+    val fitPoints = when {
+        uniqueGeoPoints.isNotEmpty() -> uniqueGeoPoints
+        mapLinePoints.isNotEmpty() -> mapLinePoints
+        else -> emptyList()
+    }
+
     if (fitViewport) {
         when {
             selectedPoint != null -> {
                 mapView.controller.setCenter(selectedPoint.geoPoint)
                 mapView.controller.setZoom(16.0)
             }
-            uniqueGeoPoints.size <= 1 -> {
-                mapView.controller.setCenter(geoPoints.first())
+            fitPoints.size == 1 -> {
+                mapView.controller.setCenter(fitPoints.first())
                 mapView.controller.setZoom(17.0)
             }
-            else -> {
-                val bounds = BoundingBox.fromGeoPoints(uniqueGeoPoints)
+            fitPoints.size > 1 -> {
+                val bounds = BoundingBox.fromGeoPoints(fitPoints)
                 mapView.controller.setCenter(bounds.center)
                 mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
                 val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
@@ -211,28 +205,75 @@ private fun renderHistoryTrack(
         }
     }
 
-    if (geoPoints.size >= 2) {
+    val density = mapView.resources.displayMetrics.density
+    railwayMapData?.lines?.forEach { line ->
+        if (line.points.size < 2) return@forEach
+
+        if (line.outlineWidth > 0f) {
+            val outline = Polyline(mapView).apply {
+                setPoints(line.points)
+                outlinePaint.color = withOpacity(line.outlineColor, line.opacity)
+                outlinePaint.strokeWidth = (line.width + line.outlineWidth * 2f) * density
+            }
+            mapView.overlays.add(outline)
+        }
+
         val polyline = Polyline(mapView).apply {
-            setPoints(geoPoints)
-            outlinePaint.color = AndroidColor.BLACK
-            outlinePaint.strokeWidth = 4f
+            setPoints(line.points)
+            outlinePaint.color = withOpacity(line.color, line.opacity)
+            outlinePaint.strokeWidth = line.width * density
         }
         mapView.overlays.add(polyline)
     }
 
-    val markerPoint = selectedPoint ?: points.last()
-    val marker = Marker(mapView).apply {
-        position = markerPoint.geoPoint
-        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-        icon = createTrainMarkerDrawable(mapView)
-        title = markerPoint.signal.trainNo + " · " + markerPoint.signal.positionKm
-        snippet = buildMarkerSnippet(markerPoint.signal)
+    railwayMapData?.stations?.forEach { station ->
+        val marker = Marker(mapView).apply {
+            position = station.point
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = createStationMarkerDrawable(mapView)
+            title = station.name
+            snippet = station.lineName
+        }
+        mapView.overlays.add(marker)
     }
-    mapView.overlays.add(marker)
+
+    val markerPoint = selectedPoint ?: points.lastOrNull()
+    if (markerPoint != null) {
+        val marker = Marker(mapView).apply {
+            position = markerPoint.geoPoint
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = createTrainMarkerDrawable(mapView)
+            title = markerPoint.signal.trainNo + " · " + markerPoint.signal.positionKm
+            snippet = buildMarkerSnippet(markerPoint.signal)
+        }
+        mapView.overlays.add(marker)
+    }
 
     mapView.invalidate()
 }
 
+private fun createStationMarkerDrawable(mapView: MapView): GradientDrawable {
+    val density = mapView.resources.displayMetrics.density
+    return GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(AndroidColor.WHITE)
+        setStroke(max(1, (1f * density).toInt()), AndroidColor.BLACK)
+        setSize(
+            (10f * density).toInt(),
+            (10f * density).toInt()
+        )
+    }
+}
+
+private fun withOpacity(color: Int, opacity: Float): Int {
+    val alpha = (AndroidColor.alpha(color) * opacity.coerceIn(0.0f, 1.0f)).toInt().coerceIn(0, 255)
+    return AndroidColor.argb(
+        alpha,
+        AndroidColor.red(color),
+        AndroidColor.green(color),
+        AndroidColor.blue(color)
+    )
+}
 private fun createTrainMarkerDrawable(mapView: MapView): GradientDrawable {
     val density = mapView.resources.displayMetrics.density
     return GradientDrawable().apply {
