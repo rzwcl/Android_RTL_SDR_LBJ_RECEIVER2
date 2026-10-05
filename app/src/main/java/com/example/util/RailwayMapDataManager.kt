@@ -121,6 +121,14 @@ class RailwayMapDataManager(context: Context) {
             val properties = feature.optJSONObject("properties") ?: JSONObject()
             when (geometry.optString("type")) {
                 "LineString" -> {
+                    val railway = properties.optString("railway").trim().lowercase()
+                    val type = properties.optString("type").trim().lowercase()
+
+                    // The map project marks railway alignment explicitly as railway=rail.
+                    // Keep type=normal as a compatible fallback when railway is omitted.
+                    val isRailwayLine = railway == "rail" || (railway.isBlank() && type == "normal")
+                    if (!isRailwayLine) continue
+
                     val points = parseLineString(geometry.optJSONArray("coordinates"))
                     if (points.size >= 2) {
                         lines += RailwayMapLine(
@@ -151,10 +159,8 @@ class RailwayMapDataManager(context: Context) {
                     val isStation =
                         railway == "station" ||
                         railway == "halt" ||
-                        railway == "service_station" ||
                         pointType == "station" ||
-                        category == "station" ||
-                        name.contains("站")
+                        category == "station"
 
                     if (isStation) {
                         stations += RailwayMapStation(
