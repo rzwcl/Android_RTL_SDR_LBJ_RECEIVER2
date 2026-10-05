@@ -131,9 +131,7 @@ abstract class LbjDatabase : RoomDatabase() {
                 )
             }
         }
-    abstract fun lbjDao(): LbjDao
 
-    companion object {
         @Volatile
         private var INSTANCE: LbjDatabase? = null
 
@@ -152,4 +150,6 @@ abstract class LbjDatabase : RoomDatabase() {
             }
         }
     }
+
+    abstract fun lbjDao(): LbjDao
 }
