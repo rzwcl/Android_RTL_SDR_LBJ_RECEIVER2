@@ -1,5 +1,7 @@
 package com.example.util
 
+import com.example.decoder.ArrivalEstimator
+
 import com.example.data.TrainSignalRecord
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,7 +56,7 @@ object HistoryCsvCodec {
                 record.locoModel,
                 record.locoCode,
                 record.route,
-                record.positionKm,
+                ArrivalEstimator.normalizePositionKm(record.positionKm),
                 record.category,
                 coordinates
             ).joinToString(",") { csvField(it) }
