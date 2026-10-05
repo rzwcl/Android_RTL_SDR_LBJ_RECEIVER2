@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.GradientDrawable
 import android.view.ViewGroup
@@ -72,10 +73,16 @@ fun HistoryTrackMap(
     }
 
     val mapView = remember(context) {
-        Configuration.getInstance().userAgentValue = context.packageName
+        Configuration.getInstance().load(
+            context,
+            context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+        )
+        Configuration.getInstance().userAgentValue =
+            "SDR-LBJ/1.1.2 (" + context.packageName + ")"
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            setUseDataConnection(true)
             minZoomLevel = 2.0
             maxZoomLevel = 18.0
             layoutParams = ViewGroup.LayoutParams(
