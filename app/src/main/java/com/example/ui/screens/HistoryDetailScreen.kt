@@ -26,9 +26,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -64,6 +68,7 @@ fun HistoryDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    var mapSource by remember { mutableStateOf(HistoryMapSource.OSM) }
     val durationSeconds = max(0L, (record.lastSeenTime - record.firstSeenTime) / 1000L)
     val durationText = if (durationSeconds >= 60L) {
         (durationSeconds / 60L).toString() + "分" + (durationSeconds % 60L) + "秒"
@@ -121,8 +126,27 @@ fun HistoryDetailScreen(
             it.longitude.isNotBlank() && it.latitude.isNotBlank()
         }
         if (hasCoordinates) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { mapSource = HistoryMapSource.OSM }
+                ) {
+                    Text("OSM")
+                }
+                OutlinedButton(
+                    onClick = { mapSource = HistoryMapSource.ESRI_WORLD_IMAGERY }
+                ) {
+                    Text("ESRI卫星")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             HistoryTrackMap(
                 signals = signals,
+                mapSource = mapSource,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(260.dp)
