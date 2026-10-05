@@ -520,9 +520,9 @@ private fun renderHistoryTrack(
     if (markerPoint != null) {
         mapView.overlays.add(
             TrainPositionOverlay(
-                mapView = mapView,
-                geoPoint = markerPoint.geoPoint,
-                angle = calculateScreenTrainAngle(mapView, points, markerIndex)
+                mapView,
+                markerPoint.geoPoint,
+                calculateScreenTrainAngle(mapView, points, markerIndex)
             )
         )
     }
