@@ -24,6 +24,7 @@ import com.example.dsp.RssiGate
 import com.example.service.LbjKeepAliveService
 import com.example.util.BasebandAudioPlayer
 import com.example.util.LbjPreferences
+import com.example.util.LbjCsvLogger
 import com.example.util.SoundAlertManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -107,6 +108,7 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = LbjPreferences(application)
     private val db = LbjDatabase.getDatabase(application)
     private val dao = db.lbjDao()
+    private val csvLogger = LbjCsvLogger(application)
 
     val historyRecords = dao.getAllTrainRecords()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -382,6 +384,9 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
                     trainDbMutex.withLock {
                         val baseNo = LocomotiveDict.extractBaseTrainNumber(currentNo)
                         val nowSeen = now
+
+                        // 每次收到一条 telemetry 都追加到当天 CSV；完全相同的信号也保留。
+                        csvLogger.append(telemetry, nowSeen)
 
                         if (isNewTrainSession) {
                             // Finalize previous train record if any
