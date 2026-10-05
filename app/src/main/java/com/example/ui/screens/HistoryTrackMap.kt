@@ -2,6 +2,10 @@ package com.example.ui.screens
 
 import android.content.Context
 import android.graphics.Color as AndroidColor
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Point
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -26,9 +30,13 @@ import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 enum class HistoryMapMode {
     OSM,
@@ -169,6 +177,198 @@ fun HistoryTrackMap(
     )
 }
 
+
+private class RailwayLabelOverlay(
+    private val mapView: MapView,
+    private val data: RailwayMapData
+) : org.osmdroid.views.overlay.Overlay() {
+
+    private val projectionPointA = Point()
+    private val projectionPointB = Point()
+
+    private val stationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        style = Paint.Style.FILL
+    }
+
+    private val stationStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.BLACK
+        style = Paint.Style.STROKE
+    }
+
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        style = Paint.Style.FILL
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        setShadowLayer(3f, 0f, 0f, AndroidColor.BLACK)
+    }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+
+        val zoom = mapView.zoomLevelDouble
+        drawRailwayNames(canvas, zoom)
+        drawStations(canvas, zoom)
+    }
+
+    private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
+        if (zoom < 9.0) return
+
+        val textSizeDp = when {
+            zoom >= 15.0 -> 13f
+            zoom >= 13.0 -> 12f
+            zoom >= 11.0 -> 11f
+            else -> 10f
+        }
+        textPaint.textSize = textSizeDp * mapView.resources.displayMetrics.density
+
+        val minLineLengthKm = when {
+            zoom >= 15.0 -> 0.15
+            zoom >= 13.0 -> 0.30
+            zoom >= 11.0 -> 0.60
+            else -> 1.20
+        }
+
+        val maxLabelsPerName = when {
+            zoom >= 15.0 -> 8
+            zoom >= 13.0 -> 5
+            zoom >= 11.0 -> 3
+            else -> 1
+        }
+
+        val usedNames = HashSet<String>()
+        data.lines.forEach { line ->
+            if (line.points.size < 2) return@forEach
+
+            val name = line.name.trim()
+            if (name.isEmpty()) return@forEach
+            if (zoom < 12.0 && name in usedNames) return@forEach
+
+            val totalKm = polylineLengthKm(line.points)
+            if (totalKm < minLineLengthKm) return@forEach
+
+            val labelCount = if (zoom >= 15.0) {
+                min(maxLabelsPerName, max(1, (totalKm / 1.0).roundToInt()))
+            } else if (zoom >= 13.0) {
+                min(maxLabelsPerName, max(1, (totalKm / 2.0).roundToInt()))
+            } else if (zoom >= 11.0) {
+                min(maxLabelsPerName, max(1, (totalKm / 4.0).roundToInt()))
+            } else {
+                1
+            }
+
+            val fractions = if (labelCount <= 1) {
+                listOf(0.5)
+            } else {
+                (1..labelCount).map { it.toDouble() / (labelCount + 1) }
+            }
+
+            fractions.forEach { fraction ->
+                val sample = samplePolyline(line.points, fraction) ?: return@forEach
+                val p1 = mapView.projection.toPixels(sample.before, projectionPointA)
+                val p2 = mapView.projection.toPixels(sample.after, projectionPointB)
+
+                val dx = (p2.x - p1.x).toFloat()
+                val dy = (p2.y - p1.y).toFloat()
+                if (dx == 0f && dy == 0f) return@forEach
+
+                var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                if (angle > 90f) angle -= 180f
+                if (angle < -90f) angle += 180f
+
+                val x = (p1.x + p2.x) / 2f
+                val y = (p1.y + p2.y) / 2f
+                if (x !in -200f..(mapView.width + 200f) || y !in -100f..(mapView.height + 100f)) {
+                    return@forEach
+                }
+
+                canvas.save()
+                canvas.rotate(angle, x, y)
+                canvas.drawText(name, x, y - 4f * mapView.resources.displayMetrics.density, textPaint)
+                canvas.restore()
+            }
+
+            usedNames += name
+        }
+    }
+
+    private fun drawStations(canvas: Canvas, zoom: Double) {
+        val shouldDrawNames = zoom >= 10.0
+        val shouldDrawMinorStations = zoom >= 12.0
+        val density = mapView.resources.displayMetrics.density
+
+        val radius = when {
+            zoom >= 15.0 -> 4.0f * density
+            zoom >= 12.0 -> 3.5f * density
+            else -> 3.0f * density
+        }
+
+        textPaint.textSize = when {
+            zoom >= 15.0 -> 13f * density
+            zoom >= 13.0 -> 12f * density
+            else -> 11f * density
+        }
+
+        data.stations.forEachIndexed { index, station ->
+            // At smaller zooms, keep the station layer sparse instead of drawing every point.
+            if (!shouldDrawMinorStations && index % 2 != 0) return@forEachIndexed
+
+            val point = mapView.projection.toPixels(station.point, Point())
+            if (point.x !in -100..(mapView.width + 100) || point.y !in -100..(mapView.height + 100)) {
+                return@forEachIndexed
+            }
+
+            stationStrokePaint.strokeWidth = max(1f, 1.0f * density)
+            canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius + 1f * density, stationStrokePaint)
+            canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius, stationPaint)
+
+            if (shouldDrawNames && station.name.isNotBlank()) {
+                canvas.drawText(
+                    station.name,
+                    point.x.toFloat(),
+                    point.y.toFloat() - radius - 4f * density,
+                    textPaint
+                )
+            }
+        }
+    }
+
+    private data class SampledSegment(
+        val before: GeoPoint,
+        val after: GeoPoint
+    )
+
+    private fun samplePolyline(points: List<GeoPoint>, fraction: Double): SampledSegment? {
+        if (points.size < 2) return null
+
+        val lengths = DoubleArray(points.size)
+        var total = 0.0
+        for (i in 1 until points.size) {
+            total += points[i - 1].distanceToAsDouble(points[i]) / 1000.0
+            lengths[i] = total
+        }
+        if (total <= 0.0) return null
+
+        val target = total * fraction.coerceIn(0.0, 1.0)
+        for (i in 1 until points.size) {
+            if (target <= lengths[i]) {
+                return SampledSegment(points[i - 1], points[i])
+            }
+        }
+        return SampledSegment(points[points.size - 2], points.last())
+    }
+
+    private fun polylineLengthKm(points: List<GeoPoint>): Double {
+        if (points.size < 2) return 0.0
+        var totalMeters = 0.0
+        for (i in 1 until points.size) {
+            totalMeters += points[i - 1].distanceToAsDouble(points[i])
+        }
+        return totalMeters / 1000.0
+    }
+}
+
 private fun renderHistoryTrack(
     mapView: MapView,
     points: List<MapPoint>,
@@ -177,6 +377,7 @@ private fun renderHistoryTrack(
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
+    mapView.closeInfoWindow()
     mapView.setTileSource(
         if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource
     )
@@ -242,15 +443,8 @@ private fun renderHistoryTrack(
         mapView.overlays.add(polyline)
     }
 
-    if (mapMode == HistoryMapMode.SATELLITE) railwayMapData?.stations?.forEach { station ->
-        val marker = Marker(mapView).apply {
-            position = station.point
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            icon = createStationMarkerDrawable(mapView)
-            title = station.name
-            snippet = station.lineName
-        }
-        mapView.overlays.add(marker)
+    if (mapMode == HistoryMapMode.SATELLITE && railwayMapData?.hasFeatures == true) {
+        mapView.overlays.add(RailwayLabelOverlay(mapView, railwayMapData))
     }
 
     val markerPoint = selectedPoint ?: points.lastOrNull()
@@ -266,19 +460,6 @@ private fun renderHistoryTrack(
     }
 
     mapView.invalidate()
-}
-
-private fun createStationMarkerDrawable(mapView: MapView): GradientDrawable {
-    val density = mapView.resources.displayMetrics.density
-    return GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
-        setColor(AndroidColor.WHITE)
-        setStroke(max(1, (1f * density).toInt()), AndroidColor.BLACK)
-        setSize(
-            (10f * density).toInt(),
-            (10f * density).toInt()
-        )
-    }
 }
 
 private fun withOpacity(color: Int, opacity: Float): Int {
