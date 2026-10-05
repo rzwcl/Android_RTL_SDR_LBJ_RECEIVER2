@@ -158,6 +158,27 @@ fun MainScreen(viewModel: LbjViewModel) {
 
     var pendingDailyCsvExportName by remember { mutableStateOf<String?>(null) }
 
+    val importRailwayMapDataLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val info = viewModel.importRailwayMapData(uri)
+                Toast.makeText(
+                    context,
+                    "已导入地图：" + info.fileName + " · " + info.lineCount + " 条线路 · " + info.stationCount + " 个车站",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "地图数据导入失败：" + (e.message ?: "未知错误"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
     val dailyCsvExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -215,6 +236,8 @@ fun MainScreen(viewModel: LbjViewModel) {
     val historyRecords by viewModel.historyRecords.collectAsState()
     val savedRoutes by viewModel.savedRouteKms.collectAsState()
     val packetLogs by viewModel.packetLogs.collectAsState()
+    val railwayMapData by viewModel.railwayMapData.collectAsState()
+    val railwayMapDataInfo by viewModel.railwayMapDataInfo.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var selectedHistoryRecordId by remember { mutableStateOf<Long?>(null) }
@@ -433,6 +456,7 @@ fun MainScreen(viewModel: LbjViewModel) {
                     HistoryDetailScreen(
                         record = selectedRecord,
                         signals = signals,
+                        railwayMapData = railwayMapData,
                         onBack = { selectedHistoryRecordId = null },
                         modifier = screenModifier
                     )
@@ -519,6 +543,18 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onOpenDailyCsv = {
                     dailyCsvFiles = viewModel.getDailyCsvFiles()
                     showDailyCsv = true
+                },
+                railwayMapDataInfo = railwayMapDataInfo,
+                onImportRailwayMapData = {
+                    importRailwayMapDataLauncher.launch(
+                        arrayOf(
+                            "application/json",
+                            "application/geo+json",
+                            "text/json",
+                            "text/plain",
+                            "*/*"
+                        )
+                    )
                 },
                 onResetAllSettings = { viewModel.resetAllSettings() },
                 onLaunchDriver = { viewModel.launchAndroidDriver() },
