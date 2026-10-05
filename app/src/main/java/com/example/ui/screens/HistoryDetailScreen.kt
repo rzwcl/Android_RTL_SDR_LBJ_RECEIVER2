@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowBack
@@ -179,6 +182,7 @@ fun HistoryDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(224.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceCard)
@@ -208,50 +212,35 @@ fun HistoryDetailScreen(
             }
         } else {
             Text(
-                text = "逐条信号",
+                text = "历史公里标",
                 color = TextPrimary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-
-            Column(
+            LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                signals.chunked(3).forEach { rowSignals ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        rowSignals.forEach { signal ->
-                            Box(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                SignalRecordCard(
-                                    signal = signal,
-                                    timeText = timeFormat.format(Date(signal.timestamp)),
-                                    selected = signal.id == selectedSignalId,
-                                    onClick = {
-                                        if (hasSignalCoordinate(signal)) {
-                                            selectedSignalId = signal.id
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "该公里标没有接收到经纬信息",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    }
-                                )
+                items(signals, key = { it.id }) { signal ->
+                    SignalRecordCard(
+                        modifier = Modifier.width(118.dp),
+                        signal = signal,
+                        timeText = timeFormat.format(Date(signal.timestamp)),
+                        selected = signal.id == selectedSignalId,
+                        onClick = {
+                            if (hasSignalCoordinate(signal)) {
+                                selectedSignalId = signal.id
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "该公里标没有接收到经纬信息",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
-
-                        repeat(3 - rowSignals.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
+                    )
                 }
             }
 
@@ -274,7 +263,7 @@ private fun HistorySummaryCard(
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
@@ -401,6 +390,7 @@ private fun buildLocomotiveText(record: TrainRecord): String {
 
 @Composable
 private fun SignalRecordCard(
+    modifier: Modifier = Modifier,
     signal: TrainSignalRecord,
     timeText: String,
     selected: Boolean,
