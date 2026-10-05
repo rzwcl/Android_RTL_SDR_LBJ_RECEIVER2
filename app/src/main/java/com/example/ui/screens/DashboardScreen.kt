@@ -395,41 +395,38 @@ fun DashboardScreen(
 
                     // SDR 模式下提供本机 RTL-SDR 驱动联动；TCP 模式不启动本机驱动。
                     if (state.connectionMode == ReceiverConnectionMode.SDR) {
-                                            // 尝试重新驱动设备 (原联动驱动)
-                                            OutlinedButton(
-                                                onClick = onLaunchDriver,
-                                                shape = RoundedCornerShape(8.dp),
-                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                                modifier = Modifier
-                                                    .weight(if (state.showSimulationButton) 1.35f else 1.5f)
-                                                    .height(40.dp)
-                                                    .testTag("launch_driver_button")
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Usb,
-                                                        contentDescription = "Driver",
-                                                        tint = PrimaryBlue,
-                                                        modifier = Modifier
-                                                            .size(15.dp)
-                                                            .padding(end = 3.dp)
-                                                    )
-                                                    Text(
-                                                        text = "尝试重新驱动设备",
-                                                        color = PrimaryBlueDark,
-                                                        fontSize = 11.5.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        maxLines = 1,
-                                                        softWrap = false
-                                                    )
-                                                }
-                                            }
-                        
-                        
+                        OutlinedButton(
+                            onClick = onLaunchDriver,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            modifier = Modifier
+                                .weight(if (state.showSimulationButton) 1.35f else 1.5f)
+                                .height(40.dp)
+                                .testTag("launch_driver_button")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Usb,
+                                    contentDescription = "Driver",
+                                    tint = PrimaryBlue,
+                                    modifier = Modifier
+                                        .size(15.dp)
+                                        .padding(end = 3.dp)
+                                )
+                                Text(
+                                    text = "尝试重新驱动设备",
+                                    color = PrimaryBlueDark,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
                     }
 
                     // 清屏
