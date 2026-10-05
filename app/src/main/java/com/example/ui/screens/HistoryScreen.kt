@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
@@ -40,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import com.example.data.TrainRecord
 import com.example.ui.theme.BlueUp
 import com.example.ui.theme.BlueUpSoft
@@ -187,7 +190,8 @@ fun HistoryScreen(
                 }
             }
         } else {
-            val listState = remember { androidx.compose.foundation.lazy.rememberLazyListState() }
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            val scrollbarScope = rememberCoroutineScope()
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = listState,
@@ -287,7 +291,7 @@ private fun HistoryScrollbar(
                         val targetIndex = (
                             nextTop / maxTravelPx * maxFirstPosition
                         ).roundToInt().coerceIn(0, maxFirstPosition)
-                        listState.scrollToItem(targetIndex)
+                        scrollbarScope.launch { listState.scrollToItem(targetIndex) }
                     }
                 )
             }
