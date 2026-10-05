@@ -351,7 +351,11 @@ class LbjDecoder(
                 "---.-"
             } else {
                 val ps = pr.replace(' ', '0')
-                if (ps.all { it.isDigit() }) "${ps.substring(0, 4)}.${ps[4]}" else "---.-"
+                if (ps.all { it.isDigit() }) {
+                    ArrivalEstimator.normalizePositionKm(ps.substring(0, 4) + "." + ps[4])
+                } else {
+                    "---.-"
+                }
             }
 
             val session = sessions.getOrPut(baseTrain!!) {
