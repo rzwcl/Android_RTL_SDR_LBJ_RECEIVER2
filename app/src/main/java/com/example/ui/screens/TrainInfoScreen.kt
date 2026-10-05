@@ -8,7 +8,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import com.example.decoder.EtaInfo
 import com.example.decoder.TrainTelemetry
 import com.example.ui.components.LiveTelemetryCard
@@ -28,6 +31,15 @@ fun TrainInfoScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        Text(
+            text = "当前列车信息",
+            color = com.example.ui.theme.PrimaryBlueDark,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         LiveTelemetryCard(
             telemetry = telemetry,
             etaInfo = etaInfo,
