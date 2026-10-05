@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -161,6 +162,7 @@ fun LiveTelemetryCard(
                         color = if (isHit) AmberSignal else if (telemetry.trainNo != "----") TextPrimary else TextSubtle,
                         fontSize = 32.sp,
                         fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 1.sp,
                         modifier = Modifier.testTag("train_number_text")
@@ -275,7 +277,8 @@ fun LiveTelemetryCard(
                             text = telemetry.locoModel,
                             color = TextPrimary,
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
                         )
                         if (telemetry.locoCode != "---") {
                             Spacer(modifier = Modifier.height(2.dp))
@@ -319,7 +322,8 @@ fun LiveTelemetryCard(
                             color = TextPrimary,
                             fontSize = 16.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -379,7 +383,9 @@ fun LiveTelemetryCard(
                         color = if (telemetry.isRouteValid) EmeraldGreen else TextPrimary,
                         fontSize = 15.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -430,7 +436,8 @@ fun LiveTelemetryCard(
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
                             )
                         }
 
@@ -445,7 +452,8 @@ fun LiveTelemetryCard(
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -511,7 +519,8 @@ fun LiveTelemetryCard(
                             color = TextPrimary,
                             fontSize = 15.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
                         )
                     }
 
