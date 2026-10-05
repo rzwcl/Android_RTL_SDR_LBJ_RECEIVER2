@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.os.Environment
+import com.example.decoder.ArrivalEstimator
 import com.example.decoder.TrainTelemetry
 import java.io.BufferedWriter
 import java.io.File
@@ -74,7 +75,7 @@ class LbjCsvLogger(context: Context) {
                             csvField(locoModel),
                             csvField(locoNumber),
                             csvField(normalizeUnknown(telemetry.route)),
-                            csvField(normalizePosition(telemetry.positionKm)),
+                            csvField(ArrivalEstimator.normalizePositionKm(telemetry.positionKm)),
                             csvField(telemetry.category),
                             csvField(coordinates)
                         ).joinToString(",")
@@ -141,9 +142,6 @@ class LbjCsvLogger(context: Context) {
         return if (value.isBlank() || value == "----" || value == "---") "****" else value
     }
 
-    private fun normalizePosition(value: String): String {
-        return if (value.isBlank() || value == "---.-" || value == "----") "" else value
-    }
 
     private fun normalizeSpeed(value: String): String {
         return if (value.isBlank() || value == "---" || value == "----") "" else value
