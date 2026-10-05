@@ -15,8 +15,10 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class RtlTcpClient(
-    val host: String = "127.0.0.1",
-    val port: Int = 1234,
+    var host: String = "127.0.0.1",
+        private set
+    var port: Int = 1234
+        private set
     initialFreqHz: Double = DspConstants.DEFAULT_FREQ_HZ,
     val dcOffsetHz: Double = DspConstants.DEFAULT_DC_OFFSET_HZ,
     val sampleRate: Int = DspConstants.RTL_SAMPLE_RATE,
@@ -66,6 +68,15 @@ class RtlTcpClient(
 
     fun recycleBuffer(buffer: ComplexBuffer) {
         bufferPool.offer(buffer)
+    }
+
+    fun setEndpoint(newHost: String, newPort: Int) {
+        val normalizedHost = newHost.trim()
+        require(normalizedHost.isNotEmpty()) { "TCP 地址不能为空" }
+        require(newPort in 1..65535) { "TCP 端口必须在 1~65535" }
+        check(!isRunning.get()) { "接收运行中不能修改 TCP 地址" }
+        host = normalizedHost
+        port = newPort
     }
 
     fun open() {
