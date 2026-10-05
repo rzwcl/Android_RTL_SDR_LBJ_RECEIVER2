@@ -158,7 +158,7 @@ object HistoryCsvCodec {
         if (value.none { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
             return value
         }
-        return """ + value.replace(""", """") + """
+        return "\"" + value.replace("\"", "\"\"") + "\""
     }
 
     private fun parseLine(line: String): List<String> {
