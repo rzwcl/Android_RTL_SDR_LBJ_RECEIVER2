@@ -79,6 +79,7 @@ fun HistoryDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    var mapMode by remember { mutableStateOf(HistoryMapMode.OSM) }
     var selectedSignalId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
 
@@ -148,9 +149,7 @@ fun HistoryDetailScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        val hasCoordinates = signals.any {
-            hasSignalCoordinate(it)
-        }
+        val hasCoordinates = signals.any { hasSignalCoordinate(it) }
         val hasRailwayMapData = railwayMapData?.hasFeatures == true
         if (hasCoordinates || hasRailwayMapData) {
             Text(
@@ -162,10 +161,10 @@ fun HistoryDetailScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                text = if (hasRailwayMapData) {
-                    "卫星影像 + 本地铁路 GeoJSON"
-                } else {
-                    "卫星影像（尚未导入本地铁路线路数据）"
+                text = when (mapMode) {
+                    HistoryMapMode.OSM -> "OpenStreetMap"
+                    HistoryMapMode.SATELLITE -> "卫星影像"
+                    HistoryMapMode.SATELLITE_RAILWAY -> "卫星影像 + 本地铁路数据"
                 },
                 color = TextSecondary,
                 fontSize = 11.sp,
@@ -173,7 +172,23 @@ fun HistoryDetailScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(6.dp))
-
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.OSM }) {
+                    Text("OSM")
+                }
+                androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.SATELLITE }) {
+                    Text("卫星")
+                }
+                if (hasRailwayMapData) {
+                    androidx.compose.material3.TextButton(onClick = { mapMode = HistoryMapMode.SATELLITE_RAILWAY }) {
+                        Text("卫星+铁路")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(2.dp))
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -185,14 +200,14 @@ fun HistoryDetailScreen(
             ) {
                 HistoryTrackMap(
                     signals = signals,
-                    railwayMapData = railwayMapData,
+                    railwayMapData = if (mapMode == HistoryMapMode.SATELLITE_RAILWAY) railwayMapData else null,
+                    mapMode = mapMode,
                     selectedSignalId = selectedSignalId,
                     modifier = Modifier.fillMaxSize()
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
-
         if (signals.isEmpty()) {
             Box(
                 modifier = Modifier
