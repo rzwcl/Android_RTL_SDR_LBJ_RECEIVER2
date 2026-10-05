@@ -100,6 +100,7 @@ fun SettingsScreen(
     onSelectThemeMode: (String) -> Unit = {},
     onClearTtsCache: () -> Pair<Int, Long> = { Pair(0, 0L) },
     onToggleEnableExternalAutomation: (Boolean) -> Unit = {},
+    onOpenLocomotiveLibrary: () -> Unit = {},
     onResetAllSettings: () -> Unit,
     onLaunchDriver: () -> Unit,
     onInstallDriver: () -> Unit = {},
@@ -329,6 +330,13 @@ fun SettingsScreen(
                         )
                     )
                 }
+
+                SettingsItem(
+                    title = "车型库",
+                    subtitle = "维护 LBJ 机车代号与车型名称；可选择内置或外置车型库并导入/导出 TXT",
+                    value = "管理",
+                    onClick = onOpenLocomotiveLibrary
+                )
 
                 val themeLabel = when (state.themeMode) {
                     "dark" -> "深色模式"
