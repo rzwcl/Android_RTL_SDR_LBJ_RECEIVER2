@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.GridCells
+import androidx.compose.foundation.lazy.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,12 +31,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +73,19 @@ fun HistoryDetailScreen(
 ) {
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     var mapSource by remember { mutableStateOf(HistoryMapSource.OSM) }
+    var selectedSignalId by remember { mutableStateOf<Long?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(signals) {
+        val selectedStillExists = selectedSignalId?.let { id ->
+            signals.any { it.id == id && hasSignalCoordinate(it) }
+        } == true
+        if (!selectedStillExists) {
+            selectedSignalId = signals.asReversed()
+                .firstOrNull { hasSignalCoordinate(it) }
+                ?.id
+        }
+    }
     val durationSeconds = max(0L, (record.lastSeenTime - record.firstSeenTime) / 1000L)
     val durationText = if (durationSeconds >= 60L) {
         (durationSeconds / 60L).toString() + "分" + (durationSeconds % 60L) + "秒"
@@ -165,6 +182,7 @@ fun HistoryDetailScreen(
                 HistoryTrackMap(
                     signals = signals,
                     mapSource = mapSource,
+                    selectedSignalId = selectedSignalId,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -193,11 +211,14 @@ fun HistoryDetailScreen(
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 4.dp)
             ) {
                 items(
                     items = signals,
@@ -205,7 +226,19 @@ fun HistoryDetailScreen(
                 ) { signal ->
                     SignalRecordCard(
                         signal = signal,
-                        timeText = timeFormat.format(Date(signal.timestamp))
+                        timeText = timeFormat.format(Date(signal.timestamp)),
+                        selected = signal.id == selectedSignalId,
+                        onClick = {
+                            if (hasSignalCoordinate(signal)) {
+                                selectedSignalId = signal.id
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "该公里标没有接收到经纬信息",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                     )
                 }
             }
@@ -355,115 +388,98 @@ private fun buildLocomotiveText(record: TrainRecord): String {
 @Composable
 private fun SignalRecordCard(
     signal: TrainSignalRecord,
-    timeText: String
+    timeText: String,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
-    val coordinates = listOf(signal.longitude.trim(), signal.latitude.trim())
-        .filter { it.isNotEmpty() }
-        .joinToString(" ")
-
+    val hasCoordinate = hasSignalCoordinate(signal)
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, BorderLight, RoundedCornerShape(10.dp)),
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) PrimaryBlueDark else BorderLight,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceCard)
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) {
+                androidx.compose.ui.graphics.Color(0xFFF1F7FF)
+            } else {
+                SurfaceCard
+            }
+        )
     ) {
-        Column(modifier = Modifier.padding(11.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.AccessTime,
-                        contentDescription = null,
-                        tint = TextMuted,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(modifier = Modifier.size(4.dp))
-                    Text(
-                        text = timeText,
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Speed,
-                        contentDescription = null,
-                        tint = EmeraldGreen,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(modifier = Modifier.size(4.dp))
-                    Text(
-                        text = if (signal.speed.isBlank() || signal.speed == "---") "未知" else signal.speed,
-                        color = EmeraldGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = " km/h",
-                        color = TextMuted,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = signal.trainNo + " · " + signal.direction,
-                    color = TextPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    text = signal.category,
-                    color = PrimaryBlueDark,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(5.dp))
-
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                text = "机车: " + signal.locoModel.ifBlank { "未知" } + " · " + signal.locoCode.ifBlank { "未知" },
-                color = TextSecondary,
-                fontSize = 11.sp
+                text = signal.positionKm.ifBlank { "未解析" },
+                color = if (selected) PrimaryBlueDark else TextPrimary,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "线路: " + signal.route.ifBlank { "未知" } + "    公里标: " + signal.positionKm.ifBlank { "未解析" },
+                text = timeText.substringAfter(' '),
                 color = TextSecondary,
-                fontSize = 11.sp
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center
             )
-
-            if (coordinates.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = PrimaryBlueDark,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(modifier = Modifier.size(4.dp))
-                    Text(
-                        text = coordinates,
-                        color = PrimaryBlueDark,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = if (hasCoordinate) "点击定位" else "无经纬信息",
+                color = if (hasCoordinate) PrimaryBlueDark else TextMuted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
+            )
         }
     }
+}
+
+private fun hasSignalCoordinate(signal: TrainSignalRecord): Boolean {
+    return parseSignalCoordinateForDetail(signal) != null
+}
+
+private fun parseSignalCoordinateForDetail(signal: TrainSignalRecord): Pair<Double, Double>? {
+    fun parseDms(value: String): Double? {
+        val text = value.trim()
+        if (text.isEmpty()) return null
+        val degreeIndex = text.indexOf('°')
+        if (degreeIndex < 1) return null
+
+        val minuteEnd = text.indexOfFirst { it == '′' || it == '\'' }
+        val minuteText = if (minuteEnd > degreeIndex) {
+            text.substring(degreeIndex + 1, minuteEnd)
+        } else {
+            text.substring(degreeIndex + 1)
+                .removeSuffix("E")
+                .removeSuffix("W")
+                .removeSuffix("N")
+                .removeSuffix("S")
+        }
+
+        val degrees = text.substring(0, degreeIndex).toDoubleOrNull() ?: return null
+        val minutes = minuteText.toDoubleOrNull() ?: return null
+        if (minutes !in 0.0..<60.0) return null
+
+        val suffix = text.lastOrNull()
+        val multiplier = if (suffix == 'W' || suffix == 'S') -1.0 else 1.0
+        return multiplier * (degrees + minutes / 60.0)
+    }
+
+    val longitude = parseDms(signal.longitude)
+    val latitude = parseDms(signal.latitude)
+    if (longitude == null || latitude == null) return null
+    if (longitude !in -180.0..180.0 || latitude !in -90.0..90.0) return null
+    if (kotlin.math.abs(longitude) <= 0.001 && kotlin.math.abs(latitude) <= 0.001) return null
+    return longitude to latitude
 }
