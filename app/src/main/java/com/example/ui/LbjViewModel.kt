@@ -138,8 +138,8 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 ReceiverConnectionMode.SDR
             },
-            host = prefs.tcpHost,
-            port = prefs.tcpPort,
+            host = if (prefs.connectionMode == "tcp") prefs.tcpHost else "127.0.0.1",
+            port = if (prefs.connectionMode == "tcp") prefs.tcpPort else 1234,
             freqHz = prefs.freqHz,
             gainDb = prefs.gainDb,
             ppm = prefs.ppm,
@@ -199,6 +199,8 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     private val rtlClient = RtlTcpClient(
+        host = if (prefs.connectionMode == "tcp") prefs.tcpHost else "127.0.0.1",
+        port = if (prefs.connectionMode == "tcp") prefs.tcpPort else 1234,
         initialFreqHz = prefs.freqHz,
         dcOffsetHz = DspConstants.DEFAULT_DC_OFFSET_HZ,
         initialGainDb = prefs.gainDb,
@@ -900,13 +902,25 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
             rtlClient.close()
         }
 
-        prefs.connectionMode = if (mode == ReceiverConnectionMode.TCP) "tcp" else "sdr"
-        _receiverState.value = _receiverState.value.copy(
-            connectionMode = mode,
-            host = prefs.tcpHost,
-            port = prefs.tcpPort,
-            connectionState = RtlTcpClient.ConnectionState.IDLE
-        )
+        if (mode == ReceiverConnectionMode.TCP) {
+            rtlClient.setEndpoint(prefs.tcpHost, prefs.tcpPort)
+            _receiverState.value = _receiverState.value.copy(
+                connectionMode = mode,
+                host = prefs.tcpHost,
+                port = prefs.tcpPort,
+                connectionState = RtlTcpClient.ConnectionState.IDLE
+            )
+            prefs.connectionMode = "tcp"
+        } else {
+            rtlClient.setEndpoint("127.0.0.1", 1234)
+            _receiverState.value = _receiverState.value.copy(
+                connectionMode = mode,
+                host = "127.0.0.1",
+                port = 1234,
+                connectionState = RtlTcpClient.ConnectionState.IDLE
+            )
+            prefs.connectionMode = "sdr"
+        }
     }
 
     fun setTcpEndpoint(host: String, port: Int): String? {
@@ -1103,13 +1117,15 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         prefs.connectionMode = "sdr"
         prefs.tcpHost = "127.0.0.1"
         prefs.tcpPort = 1234
-        rtlClient.setEndpoint("127.0.0.1", 1234)
-        _receiverState.value = _receiverState.value.copy(
-            connectionMode = ReceiverConnectionMode.SDR,
-            host = "127.0.0.1",
-            port = 1234,
-            connectionState = RtlTcpClient.ConnectionState.IDLE
-        )
+        if (!_receiverState.value.isRunning) {
+            rtlClient.setEndpoint("127.0.0.1", 1234)
+            _receiverState.value = _receiverState.value.copy(
+                connectionMode = ReceiverConnectionMode.SDR,
+                host = "127.0.0.1",
+                port = 1234,
+                connectionState = RtlTcpClient.ConnectionState.IDLE
+            )
+        }
         setFrequency(DspConstants.DEFAULT_FREQ_HZ / 1_000_000.0)
         setGain(DspConstants.HW_GAIN_DB)
         setPpm(DspConstants.PPM)
