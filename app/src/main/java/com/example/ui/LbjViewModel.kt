@@ -57,6 +57,11 @@ enum class ReceiverConnectionMode {
     TCP
 }
 
+data class DailyCsvFileInfo(
+    val name: String,
+    val sizeBytes: Long
+)
+
 data class PacketLogItem(
     val id: Long,
     val timestamp: Long,
@@ -1212,6 +1217,23 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearWarning() {
         _receiverState.value = _receiverState.value.copy(warningMessage = "")
+    }
+
+    fun getDailyCsvFiles(): List<DailyCsvFileInfo> {
+        return csvLogger.listDailyFiles().map {
+            DailyCsvFileInfo(it.name, it.sizeBytes)
+        }
+    }
+
+    suspend fun exportDailyCsvFile(name: String, uri: Uri) = withContext(Dispatchers.IO) {
+        val file = csvLogger.getDailyFile(name)
+            ?: throw IllegalArgumentException("找不到指定的每日 CSV 文件")
+        val resolver = getApplication<Application>().contentResolver
+        val inputBytes = file.readBytes()
+        resolver.openOutputStream(uri)?.use { output ->
+            output.write(inputBytes)
+            output.flush()
+        } ?: throw IllegalStateException("无法打开导出文件")
     }
 
     fun getTrainSignalRecords(trainRecordId: Long): Flow<List<TrainSignalRecord>> {
