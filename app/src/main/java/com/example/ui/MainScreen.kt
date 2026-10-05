@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.ReceiverConnectionMode
 import com.example.ui.components.CsThresholdDialog
 import com.example.ui.components.DriverInstallGuideDialog
 import com.example.ui.components.FftExplanationDialog
@@ -294,6 +295,8 @@ fun MainScreen(viewModel: LbjViewModel) {
                 etaInfo = liveEta,
                 onStartReceiver = { isSim -> viewModel.startReceiver(isSim) },
                 onStopReceiver = { viewModel.stopReceiver() },
+                onSetConnectionMode = { viewModel.setConnectionMode(it) },
+                onSetTcpEndpoint = { host, port -> viewModel.setTcpEndpoint(host, port) },
                 onLaunchDriver = { viewModel.launchAndroidDriver() },
                 onClearTelemetry = { viewModel.clearLiveTelemetry() },
                 onOpenFreqDialog = { showFreqDialog = true },
