@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,12 +42,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.example.data.TrainRecord
 import com.example.ui.theme.BlueUp
 import com.example.ui.theme.BlueUpSoft
@@ -182,19 +187,30 @@ fun HistoryScreen(
                 }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(records, key = { it.id }) { record ->
-                    TrainRecordCard(
-                        record = record,
-                        firstSeenStr = timeFormat.format(Date(record.firstSeenTime)),
-                        lastSeenStr = timeFormat.format(Date(record.lastSeenTime)),
-                        onDelete = { onDeleteRecord(record.id) },
-                        onClick = { onOpenRecord(record) }
-                    )
+            val listState = remember { androidx.compose.foundation.lazy.rememberLazyListState() }
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(records, key = { it.id }) { record ->
+                        TrainRecordCard(
+                            record = record,
+                            firstSeenStr = timeFormat.format(Date(record.firstSeenTime)),
+                            lastSeenStr = timeFormat.format(Date(record.lastSeenTime)),
+                            onDelete = { onDeleteRecord(record.id) },
+                            onClick = { onOpenRecord(record) }
+                        )
+                    }
                 }
+
+                HistoryScrollbar(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
             }
         }
     }
@@ -221,6 +237,77 @@ fun HistoryScreen(
                     Text("取消", color = TextSecondary)
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun HistoryScrollbar(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier = Modifier
+) {
+    val layoutInfo = listState.layoutInfo
+    val totalItems = layoutInfo.totalItemsCount
+    val visibleItems = layoutInfo.visibleItemsInfo.size
+
+    if (totalItems <= visibleItems || visibleItems == 0) return
+
+    var trackHeightPx by remember { mutableStateOf(0) }
+    val viewportHeightPx =
+        (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).coerceAtLeast(1)
+    val minThumbPx = 44
+    val rawThumbPx = (viewportHeightPx.toFloat() * visibleItems / totalItems).roundToInt()
+    val thumbHeightPx = rawThumbPx.coerceIn(minThumbPx, viewportHeightPx)
+    val maxTravelPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(0)
+    val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()
+    val averageItemHeightPx = if (visibleItems > 0) {
+        viewportHeightPx.toFloat() / visibleItems
+    } else {
+        1f
+    }
+    val firstPosition = (firstVisible?.index ?: 0) +
+        ((firstVisible?.offset ?: 0) / averageItemHeightPx)
+    val maxFirstPosition = (totalItems - visibleItems).coerceAtLeast(1)
+    val progress = (firstPosition / maxFirstPosition).coerceIn(0f, 1f)
+    val thumbTopPx = (maxTravelPx * progress).roundToInt()
+
+    Box(
+        modifier = modifier
+            .padding(end = 2.dp)
+            .width(16.dp)
+            .onSizeChanged { trackHeightPx = it.height }
+            .pointerInput(totalItems, visibleItems, trackHeightPx, thumbHeightPx) {
+                detectDragGestures(
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        if (maxTravelPx <= 0) return@detectDragGestures
+                        val currentTop = thumbTopPx
+                        val nextTop = (currentTop + dragAmount.y)
+                            .coerceIn(0f, maxTravelPx.toFloat())
+                        val targetIndex = (
+                            nextTop / maxTravelPx * maxFirstPosition
+                        ).roundToInt().coerceIn(0, maxFirstPosition)
+                        listState.scrollToItem(targetIndex)
+                    }
+                )
+            }
+    ) {
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(with(androidx.compose.ui.platform.LocalDensity.current) {
+                    thumbHeightPx.toDp()
+                })
+                .offset(
+                    y = with(androidx.compose.ui.platform.LocalDensity.current) {
+                        thumbTopPx.toDp()
+                    }
+                )
+                .align(Alignment.TopCenter)
+                .background(
+                    TextMuted.copy(alpha = 0.65f),
+                    RoundedCornerShape(4.dp)
+                )
         )
     }
 }
