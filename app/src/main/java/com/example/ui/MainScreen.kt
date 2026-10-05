@@ -24,6 +24,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import com.example.ui.components.SignalLossDialog
 import com.example.ui.components.TrainTypeRuleDialog
 import com.example.ui.components.WatchlistDialog
 import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.HistoryDetailScreen
 import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.PacketLogScreen
 import com.example.ui.screens.RoutesScreen
@@ -72,6 +74,14 @@ fun MainScreen(viewModel: LbjViewModel) {
     val packetLogs by viewModel.packetLogs.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedHistoryRecordId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != 1) {
+            selectedHistoryRecordId = null
+        }
+    }
+
     if (!receiverState.showPacketLogTab && selectedTab == 4) {
         selectedTab = 0
     }
@@ -197,12 +207,31 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onNavigateToPacketLogs = { selectedTab = 4 },
                 modifier = screenModifier
             )
-            1 -> HistoryScreen(
-                records = historyRecords,
-                onClearAll = { viewModel.clearHistory() },
-                onDeleteRecord = { id -> viewModel.deleteHistoryRecord(id) },
-                modifier = screenModifier
-            )
+            1 -> {
+                val selectedRecord = selectedHistoryRecordId?.let { id ->
+                    historyRecords.firstOrNull { it.id == id }
+                }
+
+                if (selectedRecord == null) {
+                    HistoryScreen(
+                        records = historyRecords,
+                        onClearAll = { viewModel.clearHistory() },
+                        onDeleteRecord = { id -> viewModel.deleteHistoryRecord(id) },
+                        onOpenRecord = { record -> selectedHistoryRecordId = record.id },
+                        modifier = screenModifier
+                    )
+                } else {
+                    val signals by viewModel.getTrainSignalRecords(selectedRecord.id)
+                        .collectAsState(initial = emptyList())
+
+                    HistoryDetailScreen(
+                        record = selectedRecord,
+                        signals = signals,
+                        onBack = { selectedHistoryRecordId = null },
+                        modifier = screenModifier
+                    )
+                }
+            }
             2 -> RoutesScreen(
                 savedRoutes = savedRoutes,
                 onAddOrEditRoute = { route, km, nickname ->
