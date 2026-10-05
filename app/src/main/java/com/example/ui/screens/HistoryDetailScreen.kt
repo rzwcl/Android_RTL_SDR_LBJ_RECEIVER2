@@ -117,6 +117,19 @@ fun HistoryDetailScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        val hasCoordinates = signals.any {
+            it.longitude.isNotBlank() && it.latitude.isNotBlank()
+        }
+        if (hasCoordinates) {
+            HistoryTrackMap(
+                signals = signals,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         if (signals.isEmpty()) {
             Box(
                 modifier = Modifier
