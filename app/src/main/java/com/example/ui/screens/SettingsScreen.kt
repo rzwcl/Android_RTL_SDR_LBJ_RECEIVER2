@@ -81,6 +81,8 @@ fun SettingsScreen(
     state: ReceiverState,
     onOpenFreqDialog: () -> Unit,
     onOpenGainDialog: () -> Unit,
+    onToggleTunerAgc: (Boolean) -> Unit = {},
+    onToggleRtlAgc: (Boolean) -> Unit = {},
     onOpenPpmDialog: () -> Unit,
     onOpenCsDialog: () -> Unit,
     onOpenWatchlistDialog: () -> Unit,
@@ -405,11 +407,24 @@ fun SettingsScreen(
                     value = String.format(Locale.US, "%.4f MHz", state.freqHz / 1_000_000.0),
                     onClick = onOpenFreqDialog
                 )
+                SettingsSwitchItem(
+                    title = "Tuner AGC",
+                    subtitle = "由 RTL-SDR 调谐器自动控制模拟前端增益；开启后手动增益不可用",
+                    checked = state.tunerAgc,
+                    onCheckedChange = onToggleTunerAgc
+                )
+                SettingsSwitchItem(
+                    title = "RTL AGC",
+                    subtitle = "由 RTL2832U 数字端自动控制 AGC",
+                    checked = state.rtlAgc,
+                    onCheckedChange = onToggleRtlAgc
+                )
                 SettingsItem(
                     title = "硬件增益 (R820T Gain)",
-                    subtitle = "调节接收灵敏度与信噪比 (默认: 15.7 dB)",
-                    value = String.format(Locale.US, "%.1f dB", state.gainDb),
-                    onClick = onOpenGainDialog
+                    subtitle = if (state.tunerAgc) "Tuner AGC 已开启，手动增益暂不可用" else "调节接收灵敏度与信噪比 (默认: 15.7 dB)",
+                    value = if (state.tunerAgc) "自动" else String.format(Locale.US, "%.1f dB", state.gainDb),
+                    onClick = onOpenGainDialog,
+                    enabled = !state.tunerAgc
                 )
                 SettingsItem(
                     title = "PPM 晶振频偏校准",
@@ -646,22 +661,27 @@ fun SettingsItem(
     title: String,
     subtitle: String,
     value: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
+    val primaryColor = if (enabled) TextPrimary else TextSecondary
+    val secondaryColor = if (enabled) TextSecondary else TextSecondary.copy(alpha = 0.55f)
+    val valueColor = if (enabled) PrimaryBlueDark else TextSecondary.copy(alpha = 0.55f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text(text = subtitle, color = TextSecondary, fontSize = 11.sp)
+            Text(text = title, color = primaryColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(text = subtitle, color = secondaryColor, fontSize = 11.sp)
         }
         Text(
             text = value,
-            color = PrimaryBlueDark,
+            color = valueColor,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
