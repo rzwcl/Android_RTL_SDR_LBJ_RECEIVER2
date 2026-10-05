@@ -161,8 +161,9 @@ class LbjCsvLogger(context: Context) {
     }
 
     private fun csvField(value: String): String {
-        if (value.none { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
+        if (value.none { ch -> ch == ',' || ch == '"' || ch == '\n' || ch == '\r' }) {
             return value
         }
         return """ + value.replace(""", """") + """
-    }}
+    }
+}
