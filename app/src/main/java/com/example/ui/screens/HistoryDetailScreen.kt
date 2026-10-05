@@ -64,6 +64,7 @@ import com.example.ui.theme.SurfaceSecondary
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.util.RailwayMapData
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,11 +74,11 @@ import kotlin.math.max
 fun HistoryDetailScreen(
     record: TrainRecord,
     signals: List<TrainSignalRecord>,
+    railwayMapData: RailwayMapData? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
-    var mapSource by remember { mutableStateOf(HistoryMapSource.OSM) }
     var selectedSignalId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
 
@@ -148,35 +149,29 @@ fun HistoryDetailScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         val hasCoordinates = signals.any {
-            it.longitude.isNotBlank() && it.latitude.isNotBlank()
+            hasSignalCoordinate(it)
         }
-        if (hasCoordinates) {
+        val hasRailwayMapData = railwayMapData?.hasFeatures == true
+        if (hasCoordinates || hasRailwayMapData) {
             Text(
-                text = "轨迹地图",
+                text = "线路地图",
                 color = TextPrimary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { mapSource = HistoryMapSource.OSM }
-                ) {
-                    Text("OSM")
-                }
-                OutlinedButton(
-                    onClick = { mapSource = HistoryMapSource.ESRI_WORLD_IMAGERY }
-                ) {
-                    Text("ESRI卫星")
-                }
-            }
-
+            Text(
+                text = if (hasRailwayMapData) {
+                    "卫星影像 + 本地铁路 GeoJSON"
+                } else {
+                    "卫星影像（尚未导入本地铁路线路数据）"
+                },
+                color = TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(6.dp))
 
             Card(
@@ -190,7 +185,7 @@ fun HistoryDetailScreen(
             ) {
                 HistoryTrackMap(
                     signals = signals,
-                    mapSource = mapSource,
+                    railwayMapData = railwayMapData,
                     selectedSignalId = selectedSignalId,
                     modifier = Modifier.fillMaxSize()
                 )
