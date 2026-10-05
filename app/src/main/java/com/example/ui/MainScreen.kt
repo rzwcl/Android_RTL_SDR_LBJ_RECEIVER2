@@ -379,6 +379,8 @@ fun MainScreen(viewModel: LbjViewModel) {
                 onClearTelemetry = { viewModel.clearLiveTelemetry() },
                 onOpenFreqDialog = { showFreqDialog = true },
                 onOpenGainDialog = { showGainDialog = true },
+                onToggleTunerAgc = { viewModel.setTunerAgc(it) },
+                onToggleRtlAgc = { viewModel.setRtlAgc(it) },
                 onOpenPpmDialog = { showPpmDialog = true },
                 onOpenCsDialog = { showCsDialog = true },
                 onOpenWatchlistDialog = { showWatchlistDialog = true },
