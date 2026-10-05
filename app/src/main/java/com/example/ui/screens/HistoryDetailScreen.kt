@@ -212,6 +212,7 @@ fun HistoryDetailScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         val hasCoordinates = signals.any { hasSignalCoordinate(it) }
+        val hasRailwayMapData = railwayMapData?.hasFeatures == true
         if (hasCoordinates || hasRailwayMapData) {
             Card(
                 modifier = Modifier
@@ -420,7 +421,7 @@ private fun DetailLine(
         Text(
             text = label + ": ",
             color = TextMuted,
-            .padding(vertical = 4.dp),
+            fontSize = 13.sp
         )
         Text(
             text = value.ifBlank { "未知" },
