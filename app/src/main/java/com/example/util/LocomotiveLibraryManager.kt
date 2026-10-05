@@ -88,7 +88,7 @@ class LocomotiveLibraryManager(context: Context) {
         val result = LinkedHashMap<Int, String>()
         val normalized = text.removePrefix("﻿")
 
-        val entryPattern = Regex("""(?<!\\S)(\\d{1,3})\\s*=\\s*(.*?)(?=\\s+\\d{1,3}\\s*=|$)""")
+        val entryPattern = Regex("""(?<!\S)(\d{1,3})\s*=\s*(.*?)(?=\s+\d{1,3}\s*=|$)""")
         normalized.lineSequence().forEach { rawLine ->
             val line = rawLine.trim()
             if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) return@forEach
