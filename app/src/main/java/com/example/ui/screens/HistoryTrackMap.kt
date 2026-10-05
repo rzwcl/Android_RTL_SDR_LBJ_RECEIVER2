@@ -32,8 +32,7 @@ import kotlin.math.max
 
 enum class HistoryMapMode {
     OSM,
-    SATELLITE,
-    SATELLITE_RAILWAY
+    SATELLITE
 }
 
 private val EsriWorldImageryTileSource = object : OnlineTileSourceBase(
@@ -191,7 +190,11 @@ private fun renderHistoryTrack(
         points.firstOrNull { it.signal.id == signalId }
     }
 
-    val mapLinePoints = railwayMapData?.lines?.flatMap { it.points }.orEmpty()
+    val mapLinePoints = if (mapMode == HistoryMapMode.SATELLITE) {
+        railwayMapData?.lines?.flatMap { it.points }.orEmpty()
+    } else {
+        emptyList()
+    }
     val fitPoints = when {
         uniqueGeoPoints.isNotEmpty() -> uniqueGeoPoints
         mapLinePoints.isNotEmpty() -> mapLinePoints
@@ -219,7 +222,7 @@ private fun renderHistoryTrack(
     }
 
     val density = mapView.resources.displayMetrics.density
-    if (mapMode == HistoryMapMode.SATELLITE_RAILWAY) railwayMapData?.lines?.forEach { line ->
+    if (mapMode == HistoryMapMode.SATELLITE) railwayMapData?.lines?.forEach { line ->
         if (line.points.size < 2) return@forEach
 
         if (line.outlineWidth > 0f) {
@@ -239,7 +242,7 @@ private fun renderHistoryTrack(
         mapView.overlays.add(polyline)
     }
 
-    if (mapMode == HistoryMapMode.SATELLITE_RAILWAY) railwayMapData?.stations?.forEach { station ->
+    if (mapMode == HistoryMapMode.SATELLITE) railwayMapData?.stations?.forEach { station ->
         val marker = Marker(mapView).apply {
             position = station.point
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
