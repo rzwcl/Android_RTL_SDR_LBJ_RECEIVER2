@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.LbjDatabase
 import com.example.data.RouteStationKmEntity
 import com.example.data.TrainRecord
+import com.example.data.TrainSignalRecord
 import com.example.decoder.ArrivalEstimator
 import com.example.decoder.EtaInfo
 import com.example.decoder.LbjDecoder
@@ -374,7 +375,9 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                // Deduplicated Train History: Exactly 1 record per train pass, synchronized via Mutex to eliminate race conditions
+                // Train history remains one record per train pass.
+                // In parallel, every telemetry callback is stored as one separate signal record.
+                // There is intentionally no content-based deduplication here.
                 viewModelScope.launch(Dispatchers.IO) {
                     trainDbMutex.withLock {
                         val baseNo = LocomotiveDict.extractBaseTrainNumber(currentNo)
@@ -462,6 +465,27 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
                                 val insertedId = dao.insertTrainRecord(newRecord)
                                 activeTrainRecordId = insertedId
                             }
+                        }
+
+                        // Exactly one DB row for this telemetry callback.
+                        // Identical consecutive signals are intentionally retained.
+                        activeTrainRecordId?.let { trainRecordId ->
+                            dao.insertTrainSignalRecord(
+                                TrainSignalRecord(
+                                    trainRecordId = trainRecordId,
+                                    trainNo = currentNo,
+                                    direction = telemetry.direction,
+                                    speed = telemetry.speed,
+                                    locoModel = telemetry.locoModel,
+                                    locoCode = telemetry.locoCode,
+                                    route = telemetry.route,
+                                    positionKm = telemetry.positionKm,
+                                    category = telemetry.category,
+                                    longitude = telemetry.longitude,
+                                    latitude = telemetry.latitude,
+                                    timestamp = nowSeen
+                                )
+                            )
                         }
                     }
                 }
