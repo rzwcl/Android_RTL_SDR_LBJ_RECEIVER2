@@ -15,10 +15,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class RtlTcpClient(
-    var host: String = "127.0.0.1",
-        private set
-    var port: Int = 1234
-        private set
+    host: String = "127.0.0.1",
+    port: Int = 1234,
     initialFreqHz: Double = DspConstants.DEFAULT_FREQ_HZ,
     val dcOffsetHz: Double = DspConstants.DEFAULT_DC_OFFSET_HZ,
     val sampleRate: Int = DspConstants.RTL_SAMPLE_RATE,
@@ -26,6 +24,10 @@ class RtlTcpClient(
     initialPpm: Int = DspConstants.PPM,
     val blockSize: Int = DspConstants.BLOCK_SIZE
 ) {
+    var host: String = host
+        private set
+    var port: Int = port
+        private set
     var targetFreqHz: Double = initialFreqHz
         private set
     var gainDb: Float = initialGainDb
