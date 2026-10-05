@@ -32,7 +32,22 @@ class LbjPreferences(context: Context) {
         private const val KEY_KEEP_SCREEN_ON = "pref_keep_screen_on"
         private const val KEY_SHOW_PACKET_LOG_TAB = "pref_show_packet_log_tab"
         private const val KEY_HAS_PROMPTED_DRIVER_INSTALL = "pref_has_prompted_driver_install"
+        private const val KEY_CONNECTION_MODE = "pref_connection_mode"
+        private const val KEY_TCP_HOST = "pref_tcp_host"
+        private const val KEY_TCP_PORT = "pref_tcp_port"
     }
+
+    var connectionMode: String
+        get() = prefs.getString(KEY_CONNECTION_MODE, "sdr") ?: "sdr"
+        set(value) = prefs.edit { putString(KEY_CONNECTION_MODE, value) }
+
+    var tcpHost: String
+        get() = prefs.getString(KEY_TCP_HOST, "127.0.0.1") ?: "127.0.0.1"
+        set(value) = prefs.edit { putString(KEY_TCP_HOST, value.trim()) }
+
+    var tcpPort: Int
+        get() = prefs.getInt(KEY_TCP_PORT, 1234).coerceIn(1, 65535)
+        set(value) = prefs.edit { putInt(KEY_TCP_PORT, value.coerceIn(1, 65535)) }
 
     var hasPromptedDriverInstall: Boolean
         get() = prefs.getBoolean(KEY_HAS_PROMPTED_DRIVER_INSTALL, false)
