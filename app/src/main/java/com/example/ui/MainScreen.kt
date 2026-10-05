@@ -1,5 +1,8 @@
 package com.example.ui
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -62,10 +65,57 @@ import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: LbjViewModel) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val exportHistoryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val count = viewModel.exportHistoryCsv(uri)
+                Toast.makeText(
+                    context,
+                    "已导出 " + count + " 条 LBJ 信号记录",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "CSV 导出失败：" + (e.message ?: "未知错误"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    val importHistoryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val count = viewModel.importHistoryCsv(uri)
+                Toast.makeText(
+                    context,
+                    "已导入 " + count + " 条 LBJ 信号记录",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "CSV 导入失败：" + (e.message ?: "未知错误"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
     val receiverState by viewModel.receiverState.collectAsState()
     val liveTelemetry by viewModel.liveTelemetry.collectAsState()
     val liveEta by viewModel.liveEta.collectAsState()
@@ -218,6 +268,19 @@ fun MainScreen(viewModel: LbjViewModel) {
                         onClearAll = { viewModel.clearHistory() },
                         onDeleteRecord = { id -> viewModel.deleteHistoryRecord(id) },
                         onOpenRecord = { record -> selectedHistoryRecordId = record.id },
+                        onImportCsv = {
+                            importHistoryLauncher.launch(
+                                arrayOf(
+                                    "text/csv",
+                                    "text/comma-separated-values",
+                                    "application/vnd.ms-excel",
+                                    "text/*"
+                                )
+                            )
+                        },
+                        onExportCsv = {
+                            exportHistoryLauncher.launch("LBJ-History.csv")
+                        },
                         modifier = screenModifier
                     )
                 } else {
