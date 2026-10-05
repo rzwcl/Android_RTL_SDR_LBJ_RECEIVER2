@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -263,7 +264,7 @@ private fun HistorySummaryCard(
     }
 
     Card(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
@@ -398,7 +399,7 @@ private fun SignalRecordCard(
 ) {
     val hasCoordinate = hasSignalCoordinate(signal)
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(
                 width = if (selected) 2.dp else 1.dp,
