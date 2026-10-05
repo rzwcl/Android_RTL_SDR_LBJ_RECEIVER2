@@ -28,6 +28,9 @@ import com.example.util.BasebandAudioPlayer
 import com.example.util.LbjPreferences
 import com.example.util.HistoryCsvCodec
 import com.example.util.LbjCsvLogger
+import com.example.util.LocomotiveLibraryEntry
+import com.example.util.LocomotiveLibraryManager
+import com.example.util.LocomotiveLibrarySource
 import com.example.util.SoundAlertManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -113,6 +116,7 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     private val db = LbjDatabase.getDatabase(application)
     private val dao = db.lbjDao()
     private val csvLogger = LbjCsvLogger(application)
+    private val locomotiveLibraryManager = LocomotiveLibraryManager(application)
 
     val historyRecords = dao.getAllTrainRecords()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -145,6 +149,16 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
         )
     )
     val receiverState: StateFlow<ReceiverState> = _receiverState.asStateFlow()
+
+    private val _locomotiveLibraryEntries =
+        MutableStateFlow<List<LocomotiveLibraryEntry>>(locomotiveLibraryManager.getEntries())
+    val locomotiveLibraryEntries: StateFlow<List<LocomotiveLibraryEntry>> =
+        _locomotiveLibraryEntries.asStateFlow()
+
+    private val _locomotiveLibrarySource =
+        MutableStateFlow(locomotiveLibraryManager.getSource())
+    val locomotiveLibrarySource: StateFlow<LocomotiveLibrarySource> =
+        _locomotiveLibrarySource.asStateFlow()
 
     private val _packetLogs = MutableStateFlow<List<PacketLogItem>>(emptyList())
     val packetLogs: StateFlow<List<PacketLogItem>> = _packetLogs.asStateFlow()
@@ -214,6 +228,8 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingApproachJob: Job? = null
 
     init {
+        locomotiveLibraryManager.applyToDecoder()
+
         // First-launch driver check
         if (!prefs.hasPromptedDriverInstall) {
             _receiverState.value = _receiverState.value.copy(showFirstLaunchDriverPrompt = true)
@@ -1114,6 +1130,51 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getTrainSignalRecords(trainRecordId: Long): Flow<List<TrainSignalRecord>> {
         return dao.getTrainSignalRecords(trainRecordId)
+    }
+
+    fun selectLocomotiveLibrary(source: LocomotiveLibrarySource) {
+        locomotiveLibraryManager.setSource(source)
+        refreshLocomotiveLibrary()
+    }
+
+    fun saveLocomotiveEntry(code: Int, name: String) {
+        locomotiveLibraryManager.addOrUpdate(code, name)
+        refreshLocomotiveLibrary()
+    }
+
+    fun deleteLocomotiveEntry(code: Int) {
+        locomotiveLibraryManager.delete(code)
+        refreshLocomotiveLibrary()
+    }
+
+    suspend fun importLocomotiveLibrary(uri: Uri): Int = withContext(Dispatchers.IO) {
+        val resolver = getApplication<Application>().contentResolver
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IllegalStateException("无法打开车型库文件")
+        val text = String(bytes, Charsets.UTF_8)
+        val count = locomotiveLibraryManager.importText(
+            if (text.contains("车型") || text.contains("代号") || text.contains("代码")) {
+                text
+            } else {
+                String(bytes, Charset.forName("GB18030"))
+            }
+        )
+        refreshLocomotiveLibrary()
+        count
+    }
+
+    suspend fun exportLocomotiveLibrary(uri: Uri): Int = withContext(Dispatchers.IO) {
+        val text = locomotiveLibraryManager.exportText()
+        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
+            output.write(text.toByteArray(Charsets.UTF_8))
+            output.flush()
+        } ?: throw IllegalStateException("无法打开车型库导出文件")
+        locomotiveLibraryManager.getEntries().size
+    }
+
+    private fun refreshLocomotiveLibrary() {
+        _locomotiveLibraryEntries.value = locomotiveLibraryManager.getEntries()
+        _locomotiveLibrarySource.value = locomotiveLibraryManager.getSource()
     }
 
     suspend fun exportHistoryCsv(uri: Uri): Int = withContext(Dispatchers.IO) {
