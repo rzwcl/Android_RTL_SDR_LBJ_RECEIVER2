@@ -755,31 +755,35 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Freq Chip
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1.35f)
+                    .height(68.dp)
                     .background(SurfaceCard, RoundedCornerShape(8.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(8.dp))
                     .clickable { onOpenFreqDialog() }
-                    .padding(8.dp)
+                    .padding(horizontal = 10.dp, vertical = 9.dp)
             ) {
-                Column {
-                    Text("频率", color = TextMuted, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("频率", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
                         String.format(Locale.US, "%.4f MHz", state.freqHz / 1_000_000.0),
                         color = PrimaryBlueDark,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
                 }
             }
 
-            // Gain Chip
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1.0f)
+                    .height(68.dp)
                     .background(SurfaceCard, RoundedCornerShape(8.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(8.dp))
                     .clickable {
@@ -793,70 +797,80 @@ fun DashboardScreen(
                             onOpenGainDialog()
                         }
                     }
-                    .padding(8.dp)
+                    .padding(horizontal = 9.dp, vertical = 9.dp)
             ) {
-                Column {
-                    Text("增益", color = TextMuted, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("增益", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
                         String.format(Locale.US, "%.1f dB", state.gainDb),
                         color = TextPrimary,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
                 }
             }
 
-            // PPM Chip
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(0.78f)
+                    .height(68.dp)
                     .background(SurfaceCard, RoundedCornerShape(8.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(8.dp))
                     .clickable { onOpenPpmDialog() }
-                    .padding(8.dp)
+                    .padding(horizontal = 8.dp, vertical = 9.dp)
             ) {
-                Column {
-                    Text("PPM", color = TextMuted, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("PPM", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
                         "${state.ppm}",
                         color = TextPrimary,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
                 }
             }
 
-            // Squelch Threshold Chip
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(0.82f)
+                    .height(68.dp)
                     .background(SurfaceCard, RoundedCornerShape(8.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(8.dp))
                     .clickable { onOpenCsDialog() }
-                    .padding(8.dp)
+                    .padding(horizontal = 8.dp, vertical = 9.dp)
             ) {
-                Column {
-                    Text("门限", color = TextMuted, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("门限", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
                         String.format(Locale.US, "%.0f dB", state.csThresholdDb),
                         color = EmeraldGreen,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
                 }
             }
-
         }
 
         Spacer(modifier = Modifier.height(14.dp))
-
         Text(
             text = "射频自动增益",
             color = TextSecondary,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -872,13 +886,11 @@ fun DashboardScreen(
             Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 2.dp)
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -888,30 +900,19 @@ fun DashboardScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.width(7.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        if (state.tunerAgc) PrimaryBlueSoft else SurfaceSecondary,
-                                        RoundedCornerShape(5.dp)
-                                    )
-                                    .padding(horizontal = 7.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = if (state.tunerAgc) "已开启" else "已关闭",
-                                    color = if (state.tunerAgc) PrimaryBlueDark else TextMuted,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text(
+                                text = if (state.tunerAgc) "已开启" else "已关闭",
+                                color = if (state.tunerAgc) PrimaryBlueDark else TextMuted,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = "自动控制 R820T 模拟前端增益",
                             color = TextSecondary,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (state.tunerAgc) "自动调节硬件增益，手动增益已锁定" else "关闭后可手动调整硬件增益",
                             color = if (state.tunerAgc) PrimaryBlueDark else TextSecondary,
@@ -919,27 +920,35 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Medium,
                             lineHeight = 16.sp
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("开关", color = TextMuted, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = state.tunerAgc,
+                                onCheckedChange = onToggleTunerAgc,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = PrimaryBlue,
+                                    uncheckedTrackColor = SurfaceSecondary
+                                ),
+                                modifier = Modifier.scale(1.05f)
+                            )
+                        }
                     }
-                    Switch(
-                        checked = state.tunerAgc,
-                        onCheckedChange = onToggleTunerAgc,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = PrimaryBlue,
-                            uncheckedTrackColor = SurfaceSecondary
-                        ),
-                        modifier = Modifier.scale(1.05f)
-                    )
+
                     Box(
                         modifier = Modifier
                             .width(1.dp)
-                            .height(76.dp)
+                            .height(126.dp)
                             .background(BorderLight)
                     )
+
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 2.dp)
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -949,30 +958,19 @@ fun DashboardScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.width(7.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        if (state.rtlAgc) PrimaryBlueSoft else SurfaceSecondary,
-                                        RoundedCornerShape(5.dp)
-                                    )
-                                    .padding(horizontal = 7.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = if (state.rtlAgc) "已开启" else "已关闭",
-                                    color = if (state.rtlAgc) PrimaryBlueDark else TextMuted,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
+                            Text(
+                                text = if (state.rtlAgc) "已开启" else "已关闭",
+                                color = if (state.rtlAgc) PrimaryBlueDark else TextMuted,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = "自动控制 RTL2832U 数字端 AGC",
                             color = TextSecondary,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (state.rtlAgc) "数字端自动增益正在工作" else "关闭后使用固定数字增益",
                             color = if (state.rtlAgc) PrimaryBlueDark else TextSecondary,
@@ -980,19 +978,28 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Medium,
                             lineHeight = 16.sp
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("开关", color = TextMuted, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = state.rtlAgc,
+                                onCheckedChange = onToggleRtlAgc,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = PrimaryBlue,
+                                    uncheckedTrackColor = SurfaceSecondary
+                                ),
+                                modifier = Modifier.scale(1.05f)
+                            )
+                        }
                     }
-                    Switch(
-                        checked = state.rtlAgc,
-                        onCheckedChange = onToggleRtlAgc,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = PrimaryBlue,
-                            uncheckedTrackColor = SurfaceSecondary
-                        ),
-                        modifier = Modifier.scale(1.05f)
-                    )
                 }
+
                 Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1035,8 +1042,8 @@ fun DashboardScreen(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(14.dp))
 
+        Spacer(modifier = Modifier.height(18.dp))
         if (state.showPacketLogTab) {
             Spacer(modifier = Modifier.height(16.dp))
             DashboardPacketLogCard(
