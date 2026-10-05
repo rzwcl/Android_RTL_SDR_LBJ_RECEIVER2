@@ -14,6 +14,8 @@ data class TrainTelemetry(
     val isHit: Boolean = false,
     val timestamp: Long = 0L,
     val rawBcd: String = "",
+    val longitude: String = "",
+    val latitude: String = "",
     val warning: String = "",
     val warningTime: Long = 0L
 )
