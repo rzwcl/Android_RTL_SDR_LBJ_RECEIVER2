@@ -21,6 +21,8 @@ class LbjPreferences(context: Context) {
         private const val KEY_KEYWORDS = "pref_keywords"
         private const val KEY_FREQ_HZ = "pref_freq_hz"
         private const val KEY_GAIN_DB = "pref_gain_db"
+        private const val KEY_TUNER_AGC = "pref_tuner_agc"
+        private const val KEY_RTL_AGC = "pref_rtl_agc"
         private const val KEY_PPM = "pref_ppm"
         private const val KEY_CS_THRESHOLD_DB = "pref_cs_threshold_db"
         private const val KEY_SHOW_SIMULATION_BTN = "pref_show_simulation_button"
@@ -152,6 +154,14 @@ class LbjPreferences(context: Context) {
     var gainDb: Float
         get() = prefs.getFloat(KEY_GAIN_DB, DspConstants.HW_GAIN_DB)
         set(value) = prefs.edit { putFloat(KEY_GAIN_DB, value) }
+
+    var tunerAgc: Boolean
+        get() = prefs.getBoolean(KEY_TUNER_AGC, false)
+        set(value) = prefs.edit { putBoolean(KEY_TUNER_AGC, value) }
+
+    var rtlAgc: Boolean
+        get() = prefs.getBoolean(KEY_RTL_AGC, false)
+        set(value) = prefs.edit { putBoolean(KEY_RTL_AGC, value) }
 
     var ppm: Int
         get() = prefs.getInt(KEY_PPM, DspConstants.PPM)
