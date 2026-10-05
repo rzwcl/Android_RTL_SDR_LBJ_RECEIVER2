@@ -31,6 +31,9 @@ import com.example.util.LbjCsvLogger
 import com.example.util.LocomotiveLibraryEntry
 import com.example.util.LocomotiveLibraryManager
 import com.example.util.LocomotiveLibrarySource
+import com.example.util.RailwayMapData
+import com.example.util.RailwayMapDataInfo
+import com.example.util.RailwayMapDataManager
 import com.example.util.SoundAlertManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -141,6 +144,7 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = db.lbjDao()
     private val csvLogger = LbjCsvLogger(application)
     private val locomotiveLibraryManager = LocomotiveLibraryManager(application)
+    private val railwayMapDataManager = RailwayMapDataManager(application)
 
     val historyRecords = dao.getAllTrainRecords()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -195,6 +199,12 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _packetLogs = MutableStateFlow<List<PacketLogItem>>(emptyList())
     val packetLogs: StateFlow<List<PacketLogItem>> = _packetLogs.asStateFlow()
+
+    private val _railwayMapData = MutableStateFlow<RailwayMapData?>(null)
+    val railwayMapData: StateFlow<RailwayMapData?> = _railwayMapData.asStateFlow()
+
+    private val _railwayMapDataInfo = MutableStateFlow<RailwayMapDataInfo?>(null)
+    val railwayMapDataInfo: StateFlow<RailwayMapDataInfo?> = _railwayMapDataInfo.asStateFlow()
 
     private val _liveTelemetry = MutableStateFlow(TrainTelemetry())
     val liveTelemetry: StateFlow<TrainTelemetry> = _liveTelemetry.asStateFlow()
@@ -274,6 +284,13 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
 
         // Refresh TTS audio cache stats
         refreshTtsCacheInfo()
+
+        // Load locally imported railway map data without depending on online OSM.
+        viewModelScope.launch(Dispatchers.IO) {
+            val data = railwayMapDataManager.load()
+            _railwayMapData.value = data
+            _railwayMapDataInfo.value = data?.info
+        }
 
         // 3-minute inactivity watchdog: if no telegram updates received within 3 minutes (180s),
         // automatically clear active train information and finalize session
@@ -1489,6 +1506,20 @@ class LbjViewModel(application: Application) : AndroidViewModel(application) {
                     value != "****" &&
                     value != "未知"
             }
+    }
+
+    suspend fun importRailwayMapData(uri: Uri): RailwayMapDataInfo = withContext(Dispatchers.IO) {
+        val data = railwayMapDataManager.importFromUri(uri)
+        _railwayMapData.value = data
+        _railwayMapDataInfo.value = data.info
+        data.info
+    }
+
+    fun clearRailwayMapData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Keep this feature replace-only for now; importing another file replaces the active dataset.
+            // The current file is intentionally retained unless a future UI exposes an explicit clear action.
+        }
     }
 
     fun clearHistory() {
