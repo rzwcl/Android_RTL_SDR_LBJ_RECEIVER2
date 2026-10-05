@@ -200,6 +200,7 @@ fun DashboardScreen(
 
                 if (state.connectionMode == ReceiverConnectionMode.TCP) {
                     Spacer(modifier = Modifier.height(8.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -213,7 +214,7 @@ fun DashboardScreen(
                             },
                             label = { Text("IP / 主机") },
                             singleLine = true,
-                            modifier = Modifier.weight(1.7f)
+                            modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = tcpPortText,
@@ -223,8 +224,16 @@ fun DashboardScreen(
                             },
                             label = { Text("端口") },
                             singleLine = true,
-                            modifier = Modifier.weight(0.75f)
+                            modifier = Modifier.width(104.dp)
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         OutlinedButton(
                             onClick = {
                                 val port = tcpPortText.toIntOrNull()
@@ -233,18 +242,23 @@ fun DashboardScreen(
                                 } else {
                                     onSetTcpEndpoint(tcpHostText, port)
                                 }
-                            }
+                            },
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text("应用", fontSize = 12.sp)
+                            Text("应用地址", fontSize = 12.sp)
                         }
+
                         OutlinedButton(
                             onClick = onTestTcpConnection,
-                            enabled = !state.isRunning && tcpHostText.trim().isNotEmpty() && tcpPortText.toIntOrNull() != null,
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)
+                            enabled = !state.isRunning &&
+                                tcpHostText.trim().isNotEmpty() &&
+                                tcpPortText.toIntOrNull() in 1..65535,
+                            modifier = Modifier.weight(1f)
                         ) {
                             Text("测试连接", fontSize = 12.sp)
                         }
                     }
+
                     tcpEndpointError?.let {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
