@@ -3,10 +3,14 @@ package com.example.ui.screens
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.GradientDrawable
+import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -55,6 +59,26 @@ private data class MapPoint(
     val geoPoint: GeoPoint
 )
 
+private data class MapViewportKey(
+    val points: List<String>,
+    val selectedSignalId: Long?
+)
+
+private class HistoryMapView(context: Context) : MapView(context) {
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+}
+
 @Composable
 fun HistoryTrackMap(
     signals: List<TrainSignalRecord>,
@@ -72,6 +96,15 @@ fun HistoryTrackMap(
             }
         }
     }
+    val viewportKey = remember(mapPoints, selectedSignalId) {
+        MapViewportKey(
+            points = mapPoints.map {
+                "${it.signal.id}:${it.geoPoint.latitude}:${it.geoPoint.longitude}"
+            },
+            selectedSignalId = selectedSignalId
+        )
+    }
+    var lastViewportKey by remember { mutableStateOf<MapViewportKey?>(null) }
 
     val mapView = remember(context) {
         Configuration.getInstance().load(
@@ -80,7 +113,7 @@ fun HistoryTrackMap(
         )
         Configuration.getInstance().userAgentValue =
             "SDR-LBJ/1.1.2 (" + context.packageName + ")"
-        MapView(context).apply {
+        HistoryMapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             setUseDataConnection(true)
@@ -115,7 +148,17 @@ fun HistoryTrackMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            renderHistoryTrack(view, mapPoints, mapSource, selectedSignalId)
+            val shouldFitViewport = viewportKey != lastViewportKey
+            renderHistoryTrack(
+                mapView = view,
+                points = mapPoints,
+                mapSource = mapSource,
+                selectedSignalId = selectedSignalId,
+                fitViewport = shouldFitViewport
+            )
+            if (shouldFitViewport) {
+                lastViewportKey = viewportKey
+            }
         }
     )
 }
@@ -124,7 +167,8 @@ private fun renderHistoryTrack(
     mapView: MapView,
     points: List<MapPoint>,
     mapSource: HistoryMapSource,
-    selectedSignalId: Long?
+    selectedSignalId: Long?,
+    fitViewport: Boolean
 ) {
     mapView.setTileSource(
         when (mapSource) {
@@ -147,21 +191,23 @@ private fun renderHistoryTrack(
         points.firstOrNull { it.signal.id == signalId }
     }
 
-    when {
-        selectedPoint != null -> {
-            mapView.controller.setCenter(selectedPoint.geoPoint)
-            mapView.controller.setZoom(16.0)
-        }
-        uniqueGeoPoints.size <= 1 -> {
-            mapView.controller.setCenter(geoPoints.first())
-            mapView.controller.setZoom(17.0)
-        }
-        else -> {
-            val bounds = BoundingBox.fromGeoPoints(uniqueGeoPoints)
-            mapView.controller.setCenter(bounds.center)
-            mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
-            val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
-            mapView.controller.setZoom(zoom)
+    if (fitViewport) {
+        when {
+            selectedPoint != null -> {
+                mapView.controller.setCenter(selectedPoint.geoPoint)
+                mapView.controller.setZoom(16.0)
+            }
+            uniqueGeoPoints.size <= 1 -> {
+                mapView.controller.setCenter(geoPoints.first())
+                mapView.controller.setZoom(17.0)
+            }
+            else -> {
+                val bounds = BoundingBox.fromGeoPoints(uniqueGeoPoints)
+                mapView.controller.setCenter(bounds.center)
+                mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
+                val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
+                mapView.controller.setZoom(zoom)
+            }
         }
     }
 
