@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +71,7 @@ fun HistoryScreen(
     records: List<TrainRecord>,
     onClearAll: () -> Unit,
     onDeleteRecord: (Long) -> Unit,
+    onOpenRecord: (TrainRecord) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showClearDialog by remember { mutableStateOf(false) }
@@ -99,7 +101,7 @@ fun HistoryScreen(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "一趟列车单条归档：记录车次、方向、机车、线路及通联起止时间",
+                    text = "点击列车卡片查看逐条 LBJ 信号、速度、位置及坐标记录",
                     color = TextSecondary,
                     fontSize = 12.sp,
                     lineHeight = 16.sp
@@ -167,7 +169,8 @@ fun HistoryScreen(
                         record = record,
                         firstSeenStr = timeFormat.format(Date(record.firstSeenTime)),
                         lastSeenStr = timeFormat.format(Date(record.lastSeenTime)),
-                        onDelete = { onDeleteRecord(record.id) }
+                        onDelete = { onDeleteRecord(record.id) },
+                        onClick = { onOpenRecord(record) }
                     )
                 }
             }
@@ -205,7 +208,8 @@ fun TrainRecordCard(
     record: TrainRecord,
     firstSeenStr: String,
     lastSeenStr: String,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: () -> Unit = {}
 ) {
     val durationSeconds = kotlin.math.max(0L, (record.lastSeenTime - record.firstSeenTime) / 1000L)
     val durationStr = if (durationSeconds >= 60) {
@@ -217,6 +221,7 @@ fun TrainRecordCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .border(1.dp, BorderLight, RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceCard)
