@@ -434,11 +434,15 @@ private class RailwayLabelOverlay(
 
                 // 与 LBJ_Map 的 containerPointToLatLng(midPt) 等价：
                 // 将当前可见段的屏幕中点转换回地理坐标，作为本次标签的地理锚点。
-                val geoAnchor = mapView.projection.fromPixels(
+                val projectedCenter = mapView.projection.fromPixels(
                     midPoint.x,
                     midPoint.y,
                     null
-                ) as GeoPoint
+                )
+                val geoAnchor = GeoPoint(
+                    projectedCenter.latitude,
+                    projectedCenter.longitude
+                )
 
                 labels.add(
                     LineLabel(
@@ -670,7 +674,6 @@ private fun renderHistoryTrack(
 
         mapView.renderedMapMode = mapMode
         mapView.renderedRailwaySignature = railwaySignature
-        mapView.railwayLabelOverlay?.refreshLabels()
     } else if (fitViewport && selectedPoint != null) {
         // 切换公里标时只移动视口，不重建底图与铁路图层。
         mapView.controller.setCenter(selectedPoint.geoPoint)
