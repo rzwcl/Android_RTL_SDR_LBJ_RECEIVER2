@@ -238,6 +238,7 @@ private class RailwayLabelOverlay(
 
     private val projectionPointA = Point()
     private val projectionPointB = Point()
+    private val projectionPoint = Point()
 
     private val stationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
@@ -274,164 +275,189 @@ private class RailwayLabelOverlay(
     }
 
     private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
-        if (zoom < 9.0) return
+        if (zoom < 8.0) return
 
+        val bounds = mapView.boundingBox
+        val density = mapView.resources.displayMetrics.density
         val textSizeDp = when {
             zoom >= 15.0 -> 14f
             zoom >= 13.0 -> 13f
             zoom >= 11.0 -> 12f
             else -> 11f
         }
-        val density = mapView.resources.displayMetrics.density
         textPaint.textSize = textSizeDp * density
         textStrokePaint.textSize = textPaint.textSize
-        textStrokePaint.strokeWidth = 3.2f * density
+        textStrokePaint.strokeWidth = 3.0f * density
 
-        val minLineLengthKm = when {
-            zoom >= 15.0 -> 0.15
-            zoom >= 13.0 -> 0.30
-            zoom >= 11.0 -> 0.60
-            else -> 1.20
-        }
+        val placedBoxes = ArrayList<RectF>()
 
-        val maxLabelsPerName = when {
-            zoom >= 15.0 -> 8
-            zoom >= 13.0 -> 5
-            zoom >= 11.0 -> 3
-            else -> 1
-        }
-
-        val usedNames = HashSet<String>()
-        data.lines.forEach { line ->
-            if (line.points.size < 2) return@forEach
-
+        data.lines.forEach lineLoop@ { line ->
             val name = line.name.trim()
-            if (name.isEmpty()) return@forEach
-            if (zoom < 12.0 && name in usedNames) return@forEach
 
-            val totalKm = polylineLengthKm(line.points)
-            if (totalKm < minLineLengthKm) return@forEach
+            // 与 LBJ_Map/map.html 一致：默认的“线路数字编号”不是可视线路名称。
+            if (name.isEmpty() || Regex("^线路\\d+$").matches(name)) return@lineLoop
+            if (line.points.size < 2) return@lineLoop
 
-            val labelCount = if (zoom >= 15.0) {
-                min(maxLabelsPerName, max(1, (totalKm / 1.0).roundToInt()))
-            } else if (zoom >= 13.0) {
-                min(maxLabelsPerName, max(1, (totalKm / 2.0).roundToInt()))
-            } else if (zoom >= 11.0) {
-                min(maxLabelsPerName, max(1, (totalKm / 4.0).roundToInt()))
-            } else {
-                1
+            val visibleSegments = ArrayList<List<GeoPoint>>()
+            var currentSegment = ArrayList<GeoPoint>()
+
+            line.points.forEach { geoPoint ->
+                if (bounds.contains(geoPoint)) {
+                    currentSegment.add(geoPoint)
+                } else {
+                    if (currentSegment.size >= 2) {
+                        visibleSegments.add(currentSegment)
+                    }
+                    currentSegment = ArrayList()
+                }
+            }
+            if (currentSegment.size >= 2) {
+                visibleSegments.add(currentSegment)
             }
 
-            val fractions = if (labelCount <= 1) {
-                listOf(0.5)
-            } else {
-                (1..labelCount).map { it.toDouble() / (labelCount + 1) }
-            }
-
-            fractions.forEach { fraction ->
-                val sample = samplePolyline(line.points, fraction) ?: return@forEach
-                val p1 = mapView.projection.toPixels(sample.before, projectionPointA)
-                val p2 = mapView.projection.toPixels(sample.after, projectionPointB)
-
-                val dx = (p2.x - p1.x).toFloat()
-                val dy = (p2.y - p1.y).toFloat()
-                if (dx == 0f && dy == 0f) return@forEach
-
-                var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-                if (angle > 90f) angle -= 180f
-                if (angle < -90f) angle += 180f
-
-                val x = (p1.x + p2.x) / 2f
-                val y = (p1.y + p2.y) / 2f
-                if (x !in -200f..(mapView.width + 200f) || y !in -100f..(mapView.height + 100f)) {
-                    return@forEach
+            visibleSegments.forEach segmentLoop@ { segment ->
+                val pixelPoints = segment.map { mapView.projection.toPixels(it, Point()) }
+                var pixelLength = 0f
+                for (i in 1 until pixelPoints.size) {
+                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toFloat()
+                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toFloat()
+                    pixelLength += kotlin.math.sqrt(dx * dx + dy * dy)
                 }
 
-                val baseline = y - 5f * density
+                if (pixelLength < 80f * density) return@segmentLoop
+
+                val targetDistance = pixelLength / 2f
+                var accumulated = 0f
+                var midPoint = pixelPoints.first()
+                var pointA = pixelPoints.first()
+                var pointB = pixelPoints[1]
+
+                for (i in 1 until pixelPoints.size) {
+                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toFloat()
+                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toFloat()
+                    val segmentDistance = kotlin.math.sqrt(dx * dx + dy * dy)
+                    if (accumulated + segmentDistance >= targetDistance) {
+                        pointA = pixelPoints[i - 1]
+                        pointB = pixelPoints[i]
+                        val ratio = if (segmentDistance > 0f) {
+                            (targetDistance - accumulated) / segmentDistance
+                        } else {
+                            0f
+                        }
+                        midPoint = Point(
+                            (pointA.x + (pointB.x - pointA.x) * ratio).roundToInt(),
+                            (pointA.y + (pointB.y - pointA.y) * ratio).roundToInt()
+                        )
+                        break
+                    }
+                    accumulated += segmentDistance
+                }
+
+                var angle = Math.toDegrees(
+                    atan2(
+                        (pointB.y - pointA.y).toDouble(),
+                        (pointB.x - pointA.x).toDouble()
+                    )
+                ).toFloat()
+                if (angle > 90f) angle -= 180f
+                else if (angle < -90f) angle += 180f
+
+                val textWidth = textPaint.measureText(name) + 8f * density
+                val x = midPoint.x.toFloat()
+                val y = midPoint.y.toFloat()
+                if (x !in -200f..(mapView.width + 200f) ||
+                    y !in -100f..(mapView.height + 100f)
+                ) {
+                    return@segmentLoop
+                }
+
+                val box = RectF(
+                    x - textWidth / 2f,
+                    y - 8f * density,
+                    x + textWidth / 2f,
+                    y + 8f * density
+                )
+                val expandedBox = RectF(
+                    box.left - 10f * density,
+                    box.top - 5f * density,
+                    box.right + 10f * density,
+                    box.bottom + 5f * density
+                )
+                if (placedBoxes.any { existing ->
+                        expandedBox.left <= existing.right &&
+                            expandedBox.right >= existing.left &&
+                            expandedBox.top <= existing.bottom &&
+                            expandedBox.bottom >= existing.top
+                    }) {
+                    return@segmentLoop
+                }
+
+                placedBoxes.add(expandedBox)
                 canvas.save()
                 canvas.rotate(angle, x, y)
+                val baseline = y - 5f * density
                 canvas.drawText(name, x, baseline, textStrokePaint)
                 canvas.drawText(name, x, baseline, textPaint)
                 canvas.restore()
             }
-
-            usedNames += name
         }
     }
 
     private fun drawStations(canvas: Canvas, zoom: Double) {
-        val shouldDrawNames = zoom >= 10.0
-        val shouldDrawMinorStations = zoom >= 12.0
         val density = mapView.resources.displayMetrics.density
 
-        val radius = when {
-            zoom >= 15.0 -> 4.0f * density
-            zoom >= 12.0 -> 3.5f * density
-            else -> 3.0f * density
-        }
+        data.stations.forEach stationLoop@ { station ->
+            val importance = station.importance
+            val shouldShow = when {
+                zoom >= 14.0 -> true
+                zoom >= 11.0 -> importance <= 5
+                zoom >= 9.0 -> importance <= 3
+                zoom >= 7.0 -> importance <= 2
+                zoom >= 5.0 -> importance <= 1
+                else -> importance <= 0
+            }
+            if (!shouldShow) return@stationLoop
 
-        textPaint.textSize = when {
-            zoom >= 15.0 -> 14f * density
-            zoom >= 13.0 -> 13f * density
-            else -> 12f * density
-        }
-        textStrokePaint.textSize = textPaint.textSize
-        textStrokePaint.strokeWidth = 3.0f * density
-
-        data.stations.forEachIndexed { index, station ->
-            // At smaller zooms, keep the station layer sparse instead of drawing every point.
-            if (!shouldDrawMinorStations && index % 2 != 0) return@forEachIndexed
-
-            val point = mapView.projection.toPixels(station.point, Point())
-            if (point.x !in -100..(mapView.width + 100) || point.y !in -100..(mapView.height + 100)) {
-                return@forEachIndexed
+            mapView.projection.toPixels(station.point, projectionPoint)
+            if (projectionPoint.x !in -100..(mapView.width + 100) ||
+                projectionPoint.y !in -100..(mapView.height + 100)
+            ) {
+                return@stationLoop
             }
 
+            val radius = when {
+                zoom >= 15.0 -> 4.0f * density
+                zoom >= 12.0 -> 3.5f * density
+                else -> 3.0f * density
+            }
             stationStrokePaint.strokeWidth = max(1f, 1.0f * density)
-            canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius + 1f * density, stationStrokePaint)
-            canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius, stationPaint)
+            canvas.drawCircle(
+                projectionPoint.x.toFloat(),
+                projectionPoint.y.toFloat(),
+                radius + 1f * density,
+                stationStrokePaint
+            )
+            canvas.drawCircle(
+                projectionPoint.x.toFloat(),
+                projectionPoint.y.toFloat(),
+                radius,
+                stationPaint
+            )
 
-            if (shouldDrawNames && station.name.isNotBlank()) {
-                val textX = point.x.toFloat()
-                val textY = point.y.toFloat() - radius - 5f * density
+            if (station.name.isNotBlank() && zoom >= 10.0) {
+                textPaint.textSize = when {
+                    zoom >= 15.0 -> 14f * density
+                    zoom >= 13.0 -> 12f * density
+                    else -> 10f * density
+                }
+                textStrokePaint.textSize = textPaint.textSize
+                textStrokePaint.strokeWidth = 3.0f * density
+                val textX = projectionPoint.x.toFloat()
+                val textY = projectionPoint.y.toFloat() - radius - 5f * density
                 canvas.drawText(station.name, textX, textY, textStrokePaint)
                 canvas.drawText(station.name, textX, textY, textPaint)
             }
         }
-    }
-
-    private data class SampledSegment(
-        val before: GeoPoint,
-        val after: GeoPoint
-    )
-
-    private fun samplePolyline(points: List<GeoPoint>, fraction: Double): SampledSegment? {
-        if (points.size < 2) return null
-
-        val lengths = DoubleArray(points.size)
-        var total = 0.0
-        for (i in 1 until points.size) {
-            total += points[i - 1].distanceToAsDouble(points[i]) / 1000.0
-            lengths[i] = total
-        }
-        if (total <= 0.0) return null
-
-        val target = total * fraction.coerceIn(0.0, 1.0)
-        for (i in 1 until points.size) {
-            if (target <= lengths[i]) {
-                return SampledSegment(points[i - 1], points[i])
-            }
-        }
-        return SampledSegment(points[points.size - 2], points.last())
-    }
-
-    private fun polylineLengthKm(points: List<GeoPoint>): Double {
-        if (points.size < 2) return 0.0
-        var totalMeters = 0.0
-        for (i in 1 until points.size) {
-            totalMeters += points[i - 1].distanceToAsDouble(points[i])
-        }
-        return totalMeters / 1000.0
     }
 }
 
@@ -521,8 +547,7 @@ private fun renderHistoryTrack(
         mapView.overlays.add(
             TrainPositionOverlay(
                 mapView,
-                markerPoint.geoPoint,
-                calculateScreenTrainAngle(mapView, points, markerIndex)
+                markerPoint.geoPoint
             )
         )
     }
@@ -541,29 +566,21 @@ private fun withOpacity(color: Int, opacity: Float): Int {
 }
 private class TrainPositionOverlay(
     private val mapView: MapView,
-    private val geoPoint: GeoPoint,
-    private val angle: Float
+    private val geoPoint: GeoPoint
 ) : org.osmdroid.views.overlay.Overlay() {
 
-    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.argb(85, 33, 150, 243)
+        style = Paint.Style.FILL
+    }
+
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
         style = Paint.Style.FILL
     }
 
-    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.BLACK
-        style = Paint.Style.STROKE
-        strokeWidth = 2.0f * mapView.resources.displayMetrics.density
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    private val windowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.rgb(45, 55, 65)
-        style = Paint.Style.FILL
-    }
-
-    private val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.rgb(55, 105, 190)
+    private val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.rgb(33, 150, 243)
         style = Paint.Style.FILL
     }
 
@@ -575,62 +592,9 @@ private class TrainPositionOverlay(
         val centerX = point.x.toFloat()
         val centerY = point.y.toFloat()
 
-        canvas.save()
-        canvas.rotate(angle, centerX, centerY)
-
-        val halfWidth = 9f * density
-        val halfHeight = 16f * density
-        val top = centerY - halfHeight
-        val bottom = centerY + halfHeight
-
-        val body = Path().apply {
-            moveTo(centerX, top)
-            cubicTo(
-                centerX - 5f * density, top + 2f * density,
-                centerX - halfWidth, top + 6f * density,
-                centerX - halfWidth, top + 10f * density
-            )
-            lineTo(centerX - halfWidth, bottom - 4f * density)
-            quadTo(centerX - halfWidth, bottom, centerX - 5f * density, bottom)
-            lineTo(centerX + 5f * density, bottom)
-            quadTo(centerX + halfWidth, bottom, centerX + halfWidth, bottom - 4f * density)
-            lineTo(centerX + halfWidth, top + 10f * density)
-            cubicTo(
-                centerX + halfWidth, top + 6f * density,
-                centerX + 5f * density, top + 2f * density,
-                centerX, top
-            )
-            close()
-        }
-
-        canvas.drawPath(body, bodyPaint)
-        canvas.drawPath(body, outlinePaint)
-
-        canvas.drawRoundRect(
-            RectF(
-                centerX - 5.2f * density,
-                top + 7f * density,
-                centerX + 5.2f * density,
-                top + 12f * density
-            ),
-            1.5f * density,
-            1.5f * density,
-            windowPaint
-        )
-
-        canvas.drawRoundRect(
-            RectF(
-                centerX - 6.5f * density,
-                top + 14f * density,
-                centerX + 6.5f * density,
-                top + 16.5f * density
-            ),
-            1.0f * density,
-            1.0f * density,
-            accentPaint
-        )
-
-        canvas.restore()
+        canvas.drawCircle(centerX, centerY, 11f * density, haloPaint)
+        canvas.drawCircle(centerX, centerY, 7f * density, ringPaint)
+        canvas.drawCircle(centerX, centerY, 5f * density, centerPaint)
     }
 
     override fun onSingleTapConfirmed(
@@ -639,42 +603,6 @@ private class TrainPositionOverlay(
     ): Boolean {
         return true
     }
-}
-
-private fun calculateScreenTrainAngle(
-    mapView: MapView,
-    points: List<MapPoint>,
-    markerIndex: Int
-): Float {
-    if (points.size < 2) return 0f
-
-    val target = points[markerIndex].geoPoint
-    val neighbor = when {
-        markerIndex < points.lastIndex -> points[markerIndex + 1].geoPoint
-        markerIndex > 0 -> points[markerIndex - 1].geoPoint
-        else -> target
-    }
-
-    if (target == neighbor) return 0f
-
-    val a = mapView.projection.toPixels(target, Point())
-    val b = mapView.projection.toPixels(neighbor, Point())
-    val dx = (b.x - a.x).toFloat()
-    val dy = (b.y - a.y).toFloat()
-
-    if (dx == 0f && dy == 0f) return 0f
-
-    return (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f) % 360f
-}
-
-private fun buildMarkerSnippet(signal: TrainSignalRecord): String {
-    val speed = signal.speed.ifBlank { "未知" }
-    val position = signal.positionKm.ifBlank { "未解析" }
-    val coordinates = listOf(signal.longitude.trim(), signal.latitude.trim())
-        .filter { it.isNotEmpty() }
-        .joinToString(" ")
-    return "速度: " + speed + " km/h\n公里标: " + position +
-        if (coordinates.isNotBlank()) "\n" + coordinates else ""
 }
 
 private fun parseSignalCoordinate(signal: TrainSignalRecord): GeoPoint? {
