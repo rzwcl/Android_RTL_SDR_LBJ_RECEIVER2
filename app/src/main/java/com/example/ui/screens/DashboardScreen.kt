@@ -765,8 +765,8 @@ fun DashboardScreen(
                     .padding(horizontal = 10.dp, vertical = 9.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("频率", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -775,8 +775,9 @@ fun DashboardScreen(
                         color = PrimaryBlueDark,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
@@ -801,8 +802,8 @@ fun DashboardScreen(
                     .padding(horizontal = 9.dp, vertical = 9.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("增益", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -827,8 +828,8 @@ fun DashboardScreen(
                     .padding(horizontal = 8.dp, vertical = 9.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("PPM", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -853,8 +854,8 @@ fun DashboardScreen(
                     .padding(horizontal = 8.dp, vertical = 9.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("门限", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -897,7 +898,8 @@ fun DashboardScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .height(154.dp),
+                            .height(154.dp)
+                            .padding(horizontal = 7.dp),
                         horizontalAlignment = Alignment.Start
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -932,7 +934,9 @@ fun DashboardScreen(
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Box(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 5.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Switch(
@@ -943,7 +947,7 @@ fun DashboardScreen(
                                     checkedTrackColor = PrimaryBlue,
                                     uncheckedTrackColor = SurfaceSecondary
                                 ),
-                                modifier = Modifier.scale(0.85f)
+                                modifier = Modifier.scale(1.05f)
                             )
                         }
                     }
@@ -958,7 +962,8 @@ fun DashboardScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .height(154.dp),
+                            .height(154.dp)
+                            .padding(horizontal = 7.dp),
                         horizontalAlignment = Alignment.Start
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -993,7 +998,9 @@ fun DashboardScreen(
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Box(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 5.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Switch(
@@ -1004,7 +1011,7 @@ fun DashboardScreen(
                                     checkedTrackColor = PrimaryBlue,
                                     uncheckedTrackColor = SurfaceSecondary
                                 ),
-                                modifier = Modifier.scale(0.85f)
+                                modifier = Modifier.scale(1.05f)
                             )
                         }
                     }
