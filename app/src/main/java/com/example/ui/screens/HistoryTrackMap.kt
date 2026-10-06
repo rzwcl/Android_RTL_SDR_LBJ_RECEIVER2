@@ -62,10 +62,12 @@ enum class HistoryMapMode {
     SATELLITE
 }
 
+// 与 LBJ_Map/map.html 保持一致：ESRI 18 级为最高原生影像级别。
+// MapView 允许继续放大到 22 级；osmdroid 会优先从缓存/低级瓦片生成放大后的近似瓦片。
 private val EsriWorldImageryTileSource = object : OnlineTileSourceBase(
     "ESRI World Imagery",
     0,
-    19,
+    18,
     256,
     ".jpg",
     arrayOf(
@@ -155,7 +157,7 @@ fun HistoryTrackMap(
             setBuiltInZoomControls(false)
             setUseDataConnection(true)
             minZoomLevel = 2.0
-            maxZoomLevel = 19.0
+            maxZoomLevel = 22.0
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -279,117 +281,136 @@ private class RailwayLabelOverlay(
     }
 
     private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
+        // 线路名称显示逻辑按 LBJ_Map/map.html 的 renderLineLabels() 移植：
+        // 只根据“当前可见线路段”计算标签位置，而不是把标签固定在线路的某个地理锚点。
         if (zoom < 8.0) return
 
         val density = mapView.resources.displayMetrics.density
-
-        // 比上一版整体放大一级，但仍跟随缩放级别变化。
-        val textSizeDp = when {
-            zoom >= 15.0 -> 14f
-            zoom >= 13.0 -> 13f
-            zoom >= 11.0 -> 12f
-            else -> 11f
-        }
-        textPaint.textSize = textSizeDp * density
+        textPaint.textSize = 11f * density
         textStrokePaint.textSize = textPaint.textSize
-        textStrokePaint.strokeWidth = 3.2f * density
+        textStrokePaint.strokeWidth = 3.0f * density
 
-        // 标签锚点固定在线路自身的地理位置。
-        // 同一条长线路使用多个固定位置，避免所有线路名都堆在一个区域。
+        val bounds = mapView.boundingBox
         val placedBoxes = ArrayList<RectF>()
 
         data.lines.forEach lineLoop@ { line ->
-            val name = line.name.trim()
+            val lineName = line.name.trim()
 
-            // 与 LBJ_Map/map.html 一致：默认“线路数字编号”不是可视线路名称。
-            if (name.isEmpty() || Regex("^线路\\d+$").matches(name)) return@lineLoop
-            if (line.points.size < 2) return@lineLoop
+            // 与 LBJ_Map 一致：线路数字编号不是可视线路名称。
+            if (lineName.isEmpty() || Regex("^线路\\d+$").matches(lineName)) return@lineLoop
 
-            val totalKm = polylineLengthKm(line.points)
-            if (totalKm <= 0.0) return@lineLoop
+            val points = line.points
+            if (points.size < 2) return@lineLoop
 
-            val lengthBasedCount = when {
-                totalKm < 2.0 -> 1
-                totalKm < 8.0 -> 2
-                totalKm < 20.0 -> 3
-                totalKm < 50.0 -> 4
-                else -> 6
+            // 与 LBJ_Map 一致：只取当前视野中连续可见的点段。
+            val visibleSegments = ArrayList<List<GeoPoint>>()
+            var currentSegment = ArrayList<GeoPoint>()
+
+            points.forEach { point ->
+                if (bounds.contains(point)) {
+                    currentSegment.add(point)
+                } else {
+                    if (currentSegment.size >= 2) {
+                        visibleSegments.add(currentSegment)
+                    }
+                    currentSegment = ArrayList()
+                }
+            }
+            if (currentSegment.size >= 2) {
+                visibleSegments.add(currentSegment)
             }
 
-            val zoomMaxCount = when {
-                zoom >= 15.0 -> 6
-                zoom >= 13.0 -> 5
-                zoom >= 11.0 -> 4
-                else -> 2
-            }
-            val labelCount = min(lengthBasedCount, zoomMaxCount)
+            visibleSegments.forEach segmentLoop@ { segment ->
+                val pixelPoints = segment.map { point ->
+                    mapView.projection.toPixels(point, Point())
+                }
 
-            val fractions = if (labelCount == 1) {
-                listOf(0.5)
-            } else {
-                (1..labelCount).map { it.toDouble() / (labelCount + 1) }
-            }
+                var pixelLength = 0.0
+                for (i in 1 until pixelPoints.size) {
+                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toDouble()
+                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toDouble()
+                    pixelLength += Math.hypot(dx, dy)
+                }
 
-            fractions.forEach fractionLoop@ { fraction ->
-                val sample = samplePolyline(line.points, fraction)
-                    ?: return@fractionLoop
+                // 与 LBJ_Map 一致：当前可见线路段不足 80px 时不显示名称。
+                if (pixelLength < 80.0) return@segmentLoop
 
-                val p1 = mapView.projection.toPixels(sample.before, projectionPointA)
-                val p2 = mapView.projection.toPixels(sample.after, projectionPointB)
+                val targetDistance = pixelLength / 2.0
+                var accumulated = 0.0
+                var midX = pixelPoints.first().x.toFloat()
+                var midY = pixelPoints.first().y.toFloat()
+                var directionA = pixelPoints.first()
+                var directionB = pixelPoints.getOrNull(1) ?: directionA
 
-                val dx = (p2.x - p1.x).toFloat()
-                val dy = (p2.y - p1.y).toFloat()
-                if (dx == 0f && dy == 0f) return@fractionLoop
+                for (i in 1 until pixelPoints.size) {
+                    val p1 = pixelPoints[i - 1]
+                    val p2 = pixelPoints[i]
+                    val dx = (p2.x - p1.x).toDouble()
+                    val dy = (p2.y - p1.y).toDouble()
+                    val segmentDistance = Math.hypot(dx, dy)
+
+                    if (accumulated + segmentDistance >= targetDistance) {
+                        directionA = p1
+                        directionB = p2
+                        val ratio = if (segmentDistance > 0.0) {
+                            (targetDistance - accumulated) / segmentDistance
+                        } else {
+                            0.0
+                        }
+                        midX = (p1.x + (p2.x - p1.x) * ratio).toFloat()
+                        midY = (p1.y + (p2.y - p1.y) * ratio).toFloat()
+                        break
+                    }
+
+                    accumulated += segmentDistance
+                }
 
                 var angle = Math.toDegrees(
-                    atan2(dy.toDouble(), dx.toDouble())
+                    atan2(
+                        (directionB.y - directionA.y).toDouble(),
+                        (directionB.x - directionA.x).toDouble()
+                    )
                 ).toFloat()
-                if (angle > 90f) angle -= 180f
-                else if (angle < -90f) angle += 180f
 
-                val x = (p1.x + p2.x) / 2f
-                val y = (p1.y + p2.y) / 2f
-                if (x !in -250f..(mapView.width + 250f) ||
-                    y !in -150f..(mapView.height + 150f)
-                ) {
-                    return@fractionLoop
+                // 与 LBJ_Map 一致：避免文字倒着显示。
+                if (angle > 90f) {
+                    angle -= 180f
+                } else if (angle < -90f) {
+                    angle += 180f
                 }
 
-                val textWidth = textPaint.measureText(name) + 10f * density
+                // 与 LBJ_Map 的 textW = lineName.length * 12 + 8 对齐，
+                // 这里只用于碰撞检测，实际文字仍由 Paint 绘制。
+                val textWidth = (lineName.length * 12f + 8f) * density
                 val box = RectF(
-                    x - textWidth / 2f,
-                    y - 10f * density,
-                    x + textWidth / 2f,
-                    y + 10f * density
-                )
-                val expandedBox = RectF(
-                    box.left - 14f * density,
-                    box.top - 8f * density,
-                    box.right + 14f * density,
-                    box.bottom + 8f * density
+                    midX - textWidth / 2f,
+                    midY - 8f * density,
+                    midX + textWidth / 2f,
+                    midY + 8f * density
                 )
 
-                // 只负责避免重叠，不改变标签本身的线路锚点。
-                if (placedBoxes.any { existing ->
-                        expandedBox.left <= existing.right &&
-                            expandedBox.right >= existing.left &&
-                            expandedBox.top <= existing.bottom &&
-                            expandedBox.bottom >= existing.top
-                    }) {
-                    return@fractionLoop
+                val overlap = placedBoxes.any { existing ->
+                    !(
+                        box.right < existing.left - 10f * density ||
+                            box.left > existing.right + 10f * density ||
+                            box.bottom < existing.top - 5f * density ||
+                            box.top > existing.bottom + 5f * density
+                    )
                 }
+                if (overlap) return@segmentLoop
 
-                placedBoxes.add(expandedBox)
+                placedBoxes.add(box)
 
                 canvas.save()
-                canvas.rotate(angle, x, y)
-                val baseline = y - 6f * density
-                canvas.drawText(name, x, baseline, textStrokePaint)
-                canvas.drawText(name, x, baseline, textPaint)
+                canvas.rotate(angle, midX, midY)
+                val baseline = midY - 4f * density
+                canvas.drawText(lineName, midX, baseline, textStrokePaint)
+                canvas.drawText(lineName, midX, baseline, textPaint)
                 canvas.restore()
             }
         }
     }
+
     private fun drawStations(canvas: Canvas, zoom: Double) {
         val density = mapView.resources.displayMetrics.density
 
@@ -547,7 +568,7 @@ private fun renderHistoryTrack(
                     val bounds = BoundingBox.fromGeoPoints(mapPointsForFit)
                     mapView.controller.setCenter(bounds.center)
                     mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
-                    val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 19.0)
+                    val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 22.0)
                     mapView.controller.setZoom(zoom)
                 }
             }
