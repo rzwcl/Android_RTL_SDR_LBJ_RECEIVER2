@@ -499,7 +499,7 @@ private fun renderHistoryTrack(
             when {
                 selectedPoint != null -> {
                     mapView.controller.setCenter(selectedPoint.geoPoint)
-                    mapView.controller.setZoom(16.0)
+                    mapView.controller.setZoom(17.5)
                 }
                 mapPointsForFit.size == 1 -> {
                     mapView.controller.setCenter(mapPointsForFit.first())
@@ -545,7 +545,7 @@ private fun renderHistoryTrack(
     } else if (fitViewport && selectedPoint != null) {
         // 切换公里标时只移动视口，不重建底图与铁路图层。
         mapView.controller.setCenter(selectedPoint.geoPoint)
-        mapView.controller.setZoom(16.0)
+        mapView.controller.setZoom(17.5)
     }
 
     val markerIndex = selectedPoint?.let { selected ->
