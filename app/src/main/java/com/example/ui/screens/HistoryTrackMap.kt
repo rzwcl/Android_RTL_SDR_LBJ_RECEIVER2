@@ -155,7 +155,7 @@ fun HistoryTrackMap(
             setBuiltInZoomControls(false)
             setUseDataConnection(true)
             minZoomLevel = 2.0
-            maxZoomLevel = 18.0
+            maxZoomLevel = 19.0
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -285,10 +285,10 @@ private class RailwayLabelOverlay(
 
         // 比上一版整体放大一级，但仍跟随缩放级别变化。
         val textSizeDp = when {
-            zoom >= 15.0 -> 17f
-            zoom >= 13.0 -> 16f
-            zoom >= 11.0 -> 15f
-            else -> 13f
+            zoom >= 15.0 -> 14f
+            zoom >= 13.0 -> 13f
+            zoom >= 11.0 -> 12f
+            else -> 11f
         }
         textPaint.textSize = textSizeDp * density
         textStrokePaint.textSize = textPaint.textSize
@@ -446,10 +446,48 @@ private class RailwayLabelOverlay(
             }
         }
     }
+
+    private data class SampledSegment(
+        val before: GeoPoint,
+        val after: GeoPoint
+    )
+
+    private fun samplePolyline(
+        points: List<GeoPoint>,
+        fraction: Double
+    ): SampledSegment? {
+        if (points.size < 2) return null
+
+        val lengths = DoubleArray(points.size)
+        var total = 0.0
+        for (i in 1 until points.size) {
+            total += points[i - 1].distanceToAsDouble(points[i]) / 1000.0
+            lengths[i] = total
+        }
+        if (total <= 0.0) return null
+
+        val target = total * fraction.coerceIn(0.0, 1.0)
+        for (i in 1 until points.size) {
+            if (target <= lengths[i]) {
+                return SampledSegment(points[i - 1], points[i])
+            }
+        }
+        return SampledSegment(points[points.size - 2], points.last())
+    }
+
+    private fun polylineLengthKm(points: List<GeoPoint>): Double {
+        if (points.size < 2) return 0.0
+
+        var totalMeters = 0.0
+        for (i in 1 until points.size) {
+            totalMeters += points[i - 1].distanceToAsDouble(points[i])
+        }
+        return totalMeters / 1000.0
+    }
 }
 
 private fun renderHistoryTrack(
-    mapView: MapView,
+    mapView: HistoryMapView,
     points: List<MapPoint>,
     railwayMapData: RailwayMapData?,
     mapMode: HistoryMapMode,
@@ -499,7 +537,7 @@ private fun renderHistoryTrack(
             when {
                 selectedPoint != null -> {
                     mapView.controller.setCenter(selectedPoint.geoPoint)
-                    mapView.controller.setZoom(17.5)
+                    mapView.controller.setZoom(18.5)
                 }
                 mapPointsForFit.size == 1 -> {
                     mapView.controller.setCenter(mapPointsForFit.first())
@@ -509,7 +547,7 @@ private fun renderHistoryTrack(
                     val bounds = BoundingBox.fromGeoPoints(mapPointsForFit)
                     mapView.controller.setCenter(bounds.center)
                     mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
-                    val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
+                    val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 19.0)
                     mapView.controller.setZoom(zoom)
                 }
             }
@@ -545,7 +583,7 @@ private fun renderHistoryTrack(
     } else if (fitViewport && selectedPoint != null) {
         // 切换公里标时只移动视口，不重建底图与铁路图层。
         mapView.controller.setCenter(selectedPoint.geoPoint)
-        mapView.controller.setZoom(17.5)
+        mapView.controller.setZoom(18.5)
     }
 
     val markerIndex = selectedPoint?.let { selected ->
