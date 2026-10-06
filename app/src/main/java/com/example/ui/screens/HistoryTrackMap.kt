@@ -277,7 +277,6 @@ private class RailwayLabelOverlay(
     private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
         if (zoom < 8.0) return
 
-        val bounds = mapView.boundingBox
         val density = mapView.resources.displayMetrics.density
         val textSizeDp = when {
             zoom >= 15.0 -> 14f
@@ -289,120 +288,112 @@ private class RailwayLabelOverlay(
         textStrokePaint.textSize = textPaint.textSize
         textStrokePaint.strokeWidth = 3.0f * density
 
+        // 标签位置固定在线路自身的世界坐标上：
+        // 不再按当前屏幕可见部分重新取“中点”，避免拖动地图时线路名一直追着屏幕中心跑。
+        // 每个 GeoJSON LineString 只提供一个稳定候选点，再通过屏幕碰撞检测把过近的标签压掉。
         val placedBoxes = ArrayList<RectF>()
 
         data.lines.forEach lineLoop@ { line ->
             val name = line.name.trim()
 
-            // 与 LBJ_Map/map.html 一致：默认的“线路数字编号”不是可视线路名称。
+            // 与 LBJ_Map/map.html 一致：默认“线路数字编号”不是可视线路名称。
             if (name.isEmpty() || Regex("^线路\\d+$").matches(name)) return@lineLoop
             if (line.points.size < 2) return@lineLoop
 
-            val visibleSegments = ArrayList<List<GeoPoint>>()
-            var currentSegment = ArrayList<GeoPoint>()
-
-            line.points.forEach { geoPoint ->
-                if (bounds.contains(geoPoint)) {
-                    currentSegment.add(geoPoint)
-                } else {
-                    if (currentSegment.size >= 2) {
-                        visibleSegments.add(currentSegment)
-                    }
-                    currentSegment = ArrayList()
-                }
-            }
-            if (currentSegment.size >= 2) {
-                visibleSegments.add(currentSegment)
+            val pixelPoints = line.points.map { mapView.projection.toPixels(it, Point()) }
+            var pixelLength = 0f
+            for (i in 1 until pixelPoints.size) {
+                val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toFloat()
+                val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toFloat()
+                pixelLength += kotlin.math.sqrt(dx * dx + dy * dy)
             }
 
-            visibleSegments.forEach segmentLoop@ { segment ->
-                val pixelPoints = segment.map { mapView.projection.toPixels(it, Point()) }
-                var pixelLength = 0f
-                for (i in 1 until pixelPoints.size) {
-                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toFloat()
-                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toFloat()
-                    pixelLength += kotlin.math.sqrt(dx * dx + dy * dy)
-                }
+            // 太短的线路片段不放字，避免大量小片段堆出密集文字。
+            val minPixelLength = when {
+                zoom >= 15.0 -> 70f * density
+                zoom >= 13.0 -> 60f * density
+                zoom >= 11.0 -> 50f * density
+                else -> 80f * density
+            }
+            if (pixelLength < minPixelLength) return@lineLoop
 
-                if (pixelLength < 80f * density) return@segmentLoop
+            // 使用完整 LineString 的固定中点，不随着 viewport 改变。
+            val targetDistance = pixelLength / 2f
+            var accumulated = 0f
+            var pointA = pixelPoints.first()
+            var pointB = pixelPoints[1]
+            var midPoint = pixelPoints.first()
 
-                val targetDistance = pixelLength / 2f
-                var accumulated = 0f
-                var midPoint = pixelPoints.first()
-                var pointA = pixelPoints.first()
-                var pointB = pixelPoints[1]
-
-                for (i in 1 until pixelPoints.size) {
-                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toFloat()
-                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toFloat()
-                    val segmentDistance = kotlin.math.sqrt(dx * dx + dy * dy)
-                    if (accumulated + segmentDistance >= targetDistance) {
-                        pointA = pixelPoints[i - 1]
-                        pointB = pixelPoints[i]
-                        val ratio = if (segmentDistance > 0f) {
-                            (targetDistance - accumulated) / segmentDistance
-                        } else {
-                            0f
-                        }
-                        midPoint = Point(
-                            (pointA.x + (pointB.x - pointA.x) * ratio).roundToInt(),
-                            (pointA.y + (pointB.y - pointA.y) * ratio).roundToInt()
-                        )
-                        break
+            for (i in 1 until pixelPoints.size) {
+                val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toFloat()
+                val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toFloat()
+                val segmentDistance = kotlin.math.sqrt(dx * dx + dy * dy)
+                if (accumulated + segmentDistance >= targetDistance) {
+                    pointA = pixelPoints[i - 1]
+                    pointB = pixelPoints[i]
+                    val ratio = if (segmentDistance > 0f) {
+                        (targetDistance - accumulated) / segmentDistance
+                    } else {
+                        0f
                     }
-                    accumulated += segmentDistance
-                }
-
-                var angle = Math.toDegrees(
-                    atan2(
-                        (pointB.y - pointA.y).toDouble(),
-                        (pointB.x - pointA.x).toDouble()
+                    midPoint = Point(
+                        (pointA.x + (pointB.x - pointA.x) * ratio).roundToInt(),
+                        (pointA.y + (pointB.y - pointA.y) * ratio).roundToInt()
                     )
-                ).toFloat()
-                if (angle > 90f) angle -= 180f
-                else if (angle < -90f) angle += 180f
-
-                val textWidth = textPaint.measureText(name) + 8f * density
-                val x = midPoint.x.toFloat()
-                val y = midPoint.y.toFloat()
-                if (x !in -200f..(mapView.width + 200f) ||
-                    y !in -100f..(mapView.height + 100f)
-                ) {
-                    return@segmentLoop
+                    break
                 }
-
-                val box = RectF(
-                    x - textWidth / 2f,
-                    y - 8f * density,
-                    x + textWidth / 2f,
-                    y + 8f * density
-                )
-                val expandedBox = RectF(
-                    box.left - 10f * density,
-                    box.top - 5f * density,
-                    box.right + 10f * density,
-                    box.bottom + 5f * density
-                )
-                if (placedBoxes.any { existing ->
-                        expandedBox.left <= existing.right &&
-                            expandedBox.right >= existing.left &&
-                            expandedBox.top <= existing.bottom &&
-                            expandedBox.bottom >= existing.top
-                    }) {
-                    return@segmentLoop
-                }
-
-                placedBoxes.add(expandedBox)
-                canvas.save()
-                canvas.rotate(angle, x, y)
-                val baseline = y - 5f * density
-                canvas.drawText(name, x, baseline, textStrokePaint)
-                canvas.drawText(name, x, baseline, textPaint)
-                canvas.restore()
+                accumulated += segmentDistance
             }
+
+            var angle = Math.toDegrees(
+                atan2(
+                    (pointB.y - pointA.y).toDouble(),
+                    (pointB.x - pointA.x).toDouble()
+                )
+            ).toFloat()
+            if (angle > 90f) angle -= 180f
+            else if (angle < -90f) angle += 180f
+
+            val textWidth = textPaint.measureText(name) + 8f * density
+            val x = midPoint.x.toFloat()
+            val y = midPoint.y.toFloat()
+            if (x !in -200f..(mapView.width + 200f) ||
+                y !in -100f..(mapView.height + 100f)
+            ) {
+                return@lineLoop
+            }
+
+            // 碰撞检测只负责“避让”，不改变这个标签自身的世界坐标锚点。
+            val box = RectF(
+                x - textWidth / 2f,
+                y - 8f * density,
+                x + textWidth / 2f,
+                y + 8f * density
+            )
+            val expandedBox = RectF(
+                box.left - 12f * density,
+                box.top - 7f * density,
+                box.right + 12f * density,
+                box.bottom + 7f * density
+            )
+            if (placedBoxes.any { existing ->
+                    expandedBox.left <= existing.right &&
+                        expandedBox.right >= existing.left &&
+                        expandedBox.top <= existing.bottom &&
+                        expandedBox.bottom >= existing.top
+                }) {
+                return@lineLoop
+            }
+
+            placedBoxes.add(expandedBox)
+            canvas.save()
+            canvas.rotate(angle, x, y)
+            val baseline = y - 5f * density
+            canvas.drawText(name, x, baseline, textStrokePaint)
+            canvas.drawText(name, x, baseline, textPaint)
+            canvas.restore()
         }
     }
-
     private fun drawStations(canvas: Canvas, zoom: Double) {
         val density = mapView.resources.displayMetrics.density
 
