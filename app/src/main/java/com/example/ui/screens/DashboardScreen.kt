@@ -766,7 +766,8 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("频率", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
@@ -801,7 +802,8 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("增益", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
@@ -826,7 +828,8 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("PPM", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
@@ -851,7 +854,8 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("门限", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text(
@@ -885,12 +889,16 @@ fun DashboardScreen(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(154.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(154.dp),
+                        horizontalAlignment = Alignment.Start
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -907,12 +915,14 @@ fun DashboardScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = "自动控制 R820T 模拟前端增益",
                             color = TextSecondary,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (state.tunerAgc) "自动调节硬件增益，手动增益已锁定" else "关闭后可手动调整硬件增益",
                             color = if (state.tunerAgc) PrimaryBlueDark else TextSecondary,
@@ -920,12 +930,11 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Medium,
                             lineHeight = 16.sp
                         )
-                        Row(
+                        Spacer(modifier = Modifier.weight(1f))
+                        Box(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("开关", color = TextMuted, fontSize = 11.sp)
-                            Spacer(modifier = Modifier.weight(1f))
                             Switch(
                                 checked = state.tunerAgc,
                                 onCheckedChange = onToggleTunerAgc,
@@ -934,7 +943,7 @@ fun DashboardScreen(
                                     checkedTrackColor = PrimaryBlue,
                                     uncheckedTrackColor = SurfaceSecondary
                                 ),
-                                modifier = Modifier.scale(1.05f)
+                                modifier = Modifier.scale(0.85f)
                             )
                         }
                     }
@@ -942,13 +951,15 @@ fun DashboardScreen(
                     Box(
                         modifier = Modifier
                             .width(1.dp)
-                            .height(126.dp)
+                            .height(154.dp)
                             .background(BorderLight)
                     )
 
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(154.dp),
+                        horizontalAlignment = Alignment.Start
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -965,12 +976,14 @@ fun DashboardScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = "自动控制 RTL2832U 数字端 AGC",
                             color = TextSecondary,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (state.rtlAgc) "数字端自动增益正在工作" else "关闭后使用固定数字增益",
                             color = if (state.rtlAgc) PrimaryBlueDark else TextSecondary,
@@ -978,12 +991,11 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Medium,
                             lineHeight = 16.sp
                         )
-                        Row(
+                        Spacer(modifier = Modifier.weight(1f))
+                        Box(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("开关", color = TextMuted, fontSize = 11.sp)
-                            Spacer(modifier = Modifier.weight(1f))
                             Switch(
                                 checked = state.rtlAgc,
                                 onCheckedChange = onToggleRtlAgc,
@@ -992,7 +1004,7 @@ fun DashboardScreen(
                                     checkedTrackColor = PrimaryBlue,
                                     uncheckedTrackColor = SurfaceSecondary
                                 ),
-                                modifier = Modifier.scale(1.05f)
+                                modifier = Modifier.scale(0.85f)
                             )
                         }
                     }
@@ -1042,7 +1054,6 @@ fun DashboardScreen(
                 }
             }
         }
-
         Spacer(modifier = Modifier.height(18.dp))
         if (state.showPacketLogTab) {
             Spacer(modifier = Modifier.height(16.dp))
