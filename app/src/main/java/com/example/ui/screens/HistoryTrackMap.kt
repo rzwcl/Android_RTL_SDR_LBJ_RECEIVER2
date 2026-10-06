@@ -281,16 +281,17 @@ private class RailwayLabelOverlay(
     }
 
     private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
-        // 线路名称显示逻辑按 LBJ_Map/map.html 的 renderLineLabels() 移植：
-        // 只根据“当前可见线路段”计算标签位置，而不是把标签固定在线路的某个地理锚点。
         if (zoom < 8.0) return
 
         val density = mapView.resources.displayMetrics.density
+
+        // 保留 LBJ_Map 的字体、描边和碰撞显示风格，但标签位置不再取“当前视野线路段中点”。
+        // 每个标签使用线路自身固定的地理锚点，因此拖动地图时标签会随线路一起移动，
+        // 不会一直吸附在屏幕中央。
         textPaint.textSize = 11f * density
         textStrokePaint.textSize = textPaint.textSize
         textStrokePaint.strokeWidth = 3.0f * density
 
-        val bounds = mapView.boundingBox
         val placedBoxes = ArrayList<RectF>()
 
         data.lines.forEach lineLoop@ { line ->
@@ -302,91 +303,65 @@ private class RailwayLabelOverlay(
             val points = line.points
             if (points.size < 2) return@lineLoop
 
-            // 与 LBJ_Map 一致：只取当前视野中连续可见的点段。
-            val visibleSegments = ArrayList<List<GeoPoint>>()
-            var currentSegment = ArrayList<GeoPoint>()
+            val totalKm = polylineLengthKm(points)
+            if (totalKm <= 0.0) return@lineLoop
 
-            points.forEach { point ->
-                if (bounds.contains(point)) {
-                    currentSegment.add(point)
-                } else {
-                    if (currentSegment.size >= 2) {
-                        visibleSegments.add(currentSegment)
-                    }
-                    currentSegment = ArrayList()
-                }
-            }
-            if (currentSegment.size >= 2) {
-                visibleSegments.add(currentSegment)
+            // 标签数量按线路长度确定，锚点始终固定在线路自身。
+            // 不再随着当前视野变化，所以平移地图时不会产生“字体追着视角走”的效果。
+            val labelCount = when {
+                totalKm < 8.0 -> 1
+                totalKm < 20.0 -> 2
+                totalKm < 50.0 -> 3
+                totalKm < 100.0 -> 4
+                else -> 6
             }
 
-            visibleSegments.forEach segmentLoop@ { segment ->
-                val pixelPoints = segment.map { point ->
-                    mapView.projection.toPixels(point, Point())
+            val fractions = if (labelCount == 1) {
+                listOf(0.5)
+            } else {
+                (1..labelCount).map { index ->
+                    index.toDouble() / (labelCount + 1)
                 }
+            }
 
-                var pixelLength = 0.0
-                for (i in 1 until pixelPoints.size) {
-                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toDouble()
-                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toDouble()
-                    pixelLength += Math.hypot(dx, dy)
-                }
+            fractions.forEach fractionLoop@ { fraction ->
+                val sample = samplePolylineAtFraction(points, fraction)
+                    ?: return@fractionLoop
 
-                // 与 LBJ_Map 一致：当前可见线路段不足 80px 时不显示名称。
-                if (pixelLength < 80.0) return@segmentLoop
+                val anchor = mapView.projection.toPixels(sample.point, projectionPoint)
+                val before = mapView.projection.toPixels(sample.before, projectionPointA)
+                val after = mapView.projection.toPixels(sample.after, projectionPointB)
 
-                val targetDistance = pixelLength / 2.0
-                var accumulated = 0.0
-                var midX = pixelPoints.first().x.toFloat()
-                var midY = pixelPoints.first().y.toFloat()
-                var directionA = pixelPoints.first()
-                var directionB = pixelPoints.getOrNull(1) ?: directionA
-
-                for (i in 1 until pixelPoints.size) {
-                    val p1 = pixelPoints[i - 1]
-                    val p2 = pixelPoints[i]
-                    val dx = (p2.x - p1.x).toDouble()
-                    val dy = (p2.y - p1.y).toDouble()
-                    val segmentDistance = Math.hypot(dx, dy)
-
-                    if (accumulated + segmentDistance >= targetDistance) {
-                        directionA = p1
-                        directionB = p2
-                        val ratio = if (segmentDistance > 0.0) {
-                            (targetDistance - accumulated) / segmentDistance
-                        } else {
-                            0.0
-                        }
-                        midX = (p1.x + (p2.x - p1.x) * ratio).toFloat()
-                        midY = (p1.y + (p2.y - p1.y) * ratio).toFloat()
-                        break
-                    }
-
-                    accumulated += segmentDistance
-                }
+                val dx = (after.x - before.x).toFloat()
+                val dy = (after.y - before.y).toFloat()
+                if (dx == 0f && dy == 0f) return@fractionLoop
 
                 var angle = Math.toDegrees(
-                    atan2(
-                        (directionB.y - directionA.y).toDouble(),
-                        (directionB.x - directionA.x).toDouble()
-                    )
+                    atan2(dy.toDouble(), dx.toDouble())
                 ).toFloat()
 
-                // 与 LBJ_Map 一致：避免文字倒着显示。
+                // 与 LBJ_Map 一致：文字保持正向，不允许上下颠倒。
                 if (angle > 90f) {
                     angle -= 180f
                 } else if (angle < -90f) {
                     angle += 180f
                 }
 
-                // 与 LBJ_Map 的 textW = lineName.length * 12 + 8 对齐，
-                // 这里只用于碰撞检测，实际文字仍由 Paint 绘制。
+                val x = anchor.x.toFloat()
+                val y = anchor.y.toFloat()
+
+                if (x !in -250f..(mapView.width + 250f) ||
+                    y !in -150f..(mapView.height + 150f)
+                ) {
+                    return@fractionLoop
+                }
+
                 val textWidth = (lineName.length * 12f + 8f) * density
                 val box = RectF(
-                    midX - textWidth / 2f,
-                    midY - 8f * density,
-                    midX + textWidth / 2f,
-                    midY + 8f * density
+                    x - textWidth / 2f,
+                    y - 8f * density,
+                    x + textWidth / 2f,
+                    y + 8f * density
                 )
 
                 val overlap = placedBoxes.any { existing ->
@@ -397,15 +372,15 @@ private class RailwayLabelOverlay(
                             box.top > existing.bottom + 5f * density
                     )
                 }
-                if (overlap) return@segmentLoop
+                if (overlap) return@fractionLoop
 
                 placedBoxes.add(box)
 
                 canvas.save()
-                canvas.rotate(angle, midX, midY)
-                val baseline = midY - 4f * density
-                canvas.drawText(lineName, midX, baseline, textStrokePaint)
-                canvas.drawText(lineName, midX, baseline, textPaint)
+                canvas.rotate(angle, x, y)
+                val baseline = y - 4f * density
+                canvas.drawText(lineName, x, baseline, textStrokePaint)
+                canvas.drawText(lineName, x, baseline, textPaint)
                 canvas.restore()
             }
         }
@@ -469,31 +444,55 @@ private class RailwayLabelOverlay(
     }
 
     private data class SampledSegment(
+        val point: GeoPoint,
         val before: GeoPoint,
         val after: GeoPoint
     )
 
-    private fun samplePolyline(
+    private fun samplePolylineAtFraction(
         points: List<GeoPoint>,
         fraction: Double
     ): SampledSegment? {
         if (points.size < 2) return null
 
         val lengths = DoubleArray(points.size)
-        var total = 0.0
+        var totalMeters = 0.0
         for (i in 1 until points.size) {
-            total += points[i - 1].distanceToAsDouble(points[i]) / 1000.0
-            lengths[i] = total
+            totalMeters += points[i - 1].distanceToAsDouble(points[i])
+            lengths[i] = totalMeters
         }
-        if (total <= 0.0) return null
+        if (totalMeters <= 0.0) return null
 
-        val target = total * fraction.coerceIn(0.0, 1.0)
+        val target = totalMeters * fraction.coerceIn(0.0, 1.0)
         for (i in 1 until points.size) {
             if (target <= lengths[i]) {
-                return SampledSegment(points[i - 1], points[i])
+                val segmentStart = points[i - 1]
+                val segmentEnd = points[i]
+                val segmentMeters = lengths[i] - lengths[i - 1]
+                val ratio = if (segmentMeters > 0.0) {
+                    ((target - lengths[i - 1]) / segmentMeters).coerceIn(0.0, 1.0)
+                } else {
+                    0.0
+                }
+
+                val lat = segmentStart.latitude +
+                    (segmentEnd.latitude - segmentStart.latitude) * ratio
+                val lon = segmentStart.longitude +
+                    (segmentEnd.longitude - segmentStart.longitude) * ratio
+
+                return SampledSegment(
+                    point = GeoPoint(lat, lon),
+                    before = segmentStart,
+                    after = segmentEnd
+                )
             }
         }
-        return SampledSegment(points[points.size - 2], points.last())
+
+        return SampledSegment(
+            point = points.last(),
+            before = points[points.size - 2],
+            after = points.last()
+        )
     }
 
     private fun polylineLengthKm(points: List<GeoPoint>): Double {
