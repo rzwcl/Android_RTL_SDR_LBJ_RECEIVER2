@@ -23,7 +23,8 @@ data class RailwayMapLine(
 data class RailwayMapStation(
     val name: String,
     val lineName: String,
-    val point: GeoPoint
+    val point: GeoPoint,
+    val importance: Int = 4
 )
 
 data class RailwayMapData(
@@ -157,17 +158,28 @@ class RailwayMapDataManager(context: Context) {
                     val pointType = properties.optString("type").trim().lowercase()
                     val name = properties.optString("name").trim()
                     val isStation =
-                        railway == "station" ||
-                        railway == "halt" ||
+                        (railway == "station" || railway == "halt" || railway == "service_station") ||
                         pointType == "station" ||
-                        category == "station"
+                        category == "station" ||
+                        name.contains("站")
 
                     if (isStation) {
+                        var importance = 4
+                        when (railway) {
+                            "station" -> importance = 4
+                            "halt" -> importance = 8
+                            "service_station" -> importance = 7
+                        }
+                        if (name.contains("线路所")) importance = 7
+                        else if (name.contains("乘降所")) importance = 8
+                        else if (name.contains("废弃")) importance = 9
+
                         stations += RailwayMapStation(
                             name = name.ifBlank { "车站" },
                             lineName = properties.optString("_lineName").trim()
                                 .ifBlank { properties.optString("line").trim() },
-                            point = GeoPoint(latitude, longitude)
+                            point = GeoPoint(latitude, longitude),
+                            importance = importance
                         )
                     }
                 }
