@@ -369,7 +369,7 @@ private fun HistorySummaryCard(
                 Text(
                     text = record.category,
                     color = PrimaryBlueDark,
-                    fontSize = 15.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -379,12 +379,14 @@ private fun HistorySummaryCard(
             DetailLine(
                 icon = Icons.Default.Train,
                 label = "机车",
-                value = buildLocomotiveText(record)
+                value = buildLocomotiveText(record),
+                emphasized = true
             )
             DetailLine(
                 icon = Icons.Default.Route,
                 label = "线路",
-                value = record.route
+                value = record.route,
+                emphasized = true
             )
             DetailLine(
                 icon = Icons.Default.LocationOn,
@@ -431,7 +433,8 @@ private fun HistorySummaryCard(
 private fun DetailLine(
     icon: ImageVector,
     label: String,
-    value: String
+    value: String,
+    emphasized: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -449,13 +452,13 @@ private fun DetailLine(
         Text(
             text = label + ": ",
             color = TextMuted,
-            fontSize = 14.sp,
+            fontSize = if (emphasized) 15.sp else 14.sp,
             fontWeight = FontWeight.Medium
         )
         Text(
             text = value.ifBlank { "未知" },
             color = TextPrimary,
-            fontSize = 15.sp,
+            fontSize = if (emphasized) 18.sp else 15.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f)
         )
