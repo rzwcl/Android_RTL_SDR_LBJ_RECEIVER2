@@ -94,6 +94,10 @@ private data class MapViewportKey(
 )
 
 private class HistoryMapView(context: Context) : MapView(context) {
+    var renderedMapMode: HistoryMapMode? = null
+    var renderedRailwaySignature: String = ""
+    var trainPositionOverlay: TrainPositionOverlay? = null
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -460,10 +464,13 @@ private fun renderHistoryTrack(
     selectedSignalId: Long?,
     fitViewport: Boolean
 ) {
-    mapView.setTileSource(
-        if (mapMode == HistoryMapMode.OSM) TileSourceFactory.MAPNIK else EsriWorldImageryTileSource
-    )
-    mapView.overlays.clear()
+    val railwaySignature = railwayMapData?.let {
+        it.fileName + ":" + it.lines.size + ":" + it.stations.size
+    } ?: ""
+
+    val baseChanged =
+        mapView.renderedMapMode != mapMode ||
+            mapView.renderedRailwaySignature != railwaySignature
 
     val geoPoints = points.map { it.geoPoint }
     val uniqueGeoPoints = geoPoints.distinctBy { point ->
@@ -473,79 +480,113 @@ private fun renderHistoryTrack(
         points.firstOrNull { it.signal.id == signalId }
     }
 
-    val mapLinePoints = if (mapMode == HistoryMapMode.SATELLITE) {
-        railwayMapData?.lines?.flatMap { it.points }.orEmpty()
-    } else {
-        emptyList()
-    }
-    val fitPoints = when {
-        uniqueGeoPoints.isNotEmpty() -> uniqueGeoPoints
-        mapLinePoints.isNotEmpty() -> mapLinePoints
-        else -> emptyList()
-    }
+    if (baseChanged) {
+        mapView.setTileSource(
+            if (mapMode == HistoryMapMode.OSM) {
+                TileSourceFactory.MAPNIK
+            } else {
+                EsriWorldImageryTileSource
+            }
+        )
+        mapView.overlays.clear()
+        mapView.trainPositionOverlay = null
 
-    if (fitViewport) {
-        when {
-            selectedPoint != null -> {
-                mapView.controller.setCenter(selectedPoint.geoPoint)
-                mapView.controller.setZoom(16.0)
-            }
-            fitPoints.size == 1 -> {
-                mapView.controller.setCenter(fitPoints.first())
-                mapView.controller.setZoom(17.0)
-            }
-            fitPoints.size > 1 -> {
-                val bounds = BoundingBox.fromGeoPoints(fitPoints)
-                mapView.controller.setCenter(bounds.center)
-                mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
-                val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
-                mapView.controller.setZoom(zoom)
+        val mapLinePoints = if (mapMode == HistoryMapMode.SATELLITE) {
+            railwayMapData?.lines?.flatMap { it.points }.orEmpty()
+        } else {
+            emptyList()
+        }
+
+        val mapPointsForFit = when {
+            uniqueGeoPoints.isNotEmpty() -> uniqueGeoPoints
+            mapLinePoints.isNotEmpty() -> mapLinePoints
+            else -> emptyList()
+        }
+
+        if (fitViewport) {
+            when {
+                selectedPoint != null -> {
+                    mapView.controller.setCenter(selectedPoint.geoPoint)
+                    mapView.controller.setZoom(16.0)
+                }
+                mapPointsForFit.size == 1 -> {
+                    mapView.controller.setCenter(mapPointsForFit.first())
+                    mapView.controller.setZoom(17.0)
+                }
+                mapPointsForFit.size > 1 -> {
+                    val bounds = BoundingBox.fromGeoPoints(mapPointsForFit)
+                    mapView.controller.setCenter(bounds.center)
+                    mapView.zoomToBoundingBox(bounds.increaseByScale(1.25f), false)
+                    val zoom = mapView.zoomLevelDouble.coerceIn(2.0, 18.0)
+                    mapView.controller.setZoom(zoom)
+                }
             }
         }
-    }
 
-    val density = mapView.resources.displayMetrics.density
-    if (mapMode == HistoryMapMode.SATELLITE) railwayMapData?.lines?.forEach { line ->
-        if (line.points.size < 2) return@forEach
+        val density = mapView.resources.displayMetrics.density
+        if (mapMode == HistoryMapMode.SATELLITE) railwayMapData?.lines?.forEach { line ->
+            if (line.points.size < 2) return@forEach
 
-        if (line.outlineWidth > 0f) {
-            val outline = Polyline(mapView).apply {
+            if (line.outlineWidth > 0f) {
+                val outline = Polyline(mapView).apply {
+                    setPoints(line.points)
+                    outlinePaint.color = withOpacity(line.outlineColor, line.opacity)
+                    outlinePaint.strokeWidth = (line.width + line.outlineWidth * 2f) * density
+                }
+                mapView.overlays.add(outline)
+            }
+
+            val polyline = Polyline(mapView).apply {
                 setPoints(line.points)
-                outlinePaint.color = withOpacity(line.outlineColor, line.opacity)
-                outlinePaint.strokeWidth = (line.width + line.outlineWidth * 2f) * density
+                outlinePaint.color = withOpacity(line.color, line.opacity)
+                outlinePaint.strokeWidth = line.width * density
             }
-            mapView.overlays.add(outline)
+            mapView.overlays.add(polyline)
         }
 
-        val polyline = Polyline(mapView).apply {
-            setPoints(line.points)
-            outlinePaint.color = withOpacity(line.color, line.opacity)
-            outlinePaint.strokeWidth = line.width * density
+        if (mapMode == HistoryMapMode.SATELLITE && railwayMapData?.hasFeatures == true) {
+            mapView.overlays.add(RailwayLabelOverlay(mapView, railwayMapData))
         }
-        mapView.overlays.add(polyline)
-    }
 
-    if (mapMode == HistoryMapMode.SATELLITE && railwayMapData?.hasFeatures == true) {
-        mapView.overlays.add(RailwayLabelOverlay(mapView, railwayMapData))
+        mapView.renderedMapMode = mapMode
+        mapView.renderedRailwaySignature = railwaySignature
+    } else if (fitViewport && selectedPoint != null) {
+        // 切换公里标时只移动视口，不重建底图与铁路图层。
+        mapView.controller.setCenter(selectedPoint.geoPoint)
+        mapView.controller.setZoom(16.0)
     }
 
     val markerIndex = selectedPoint?.let { selected ->
         points.indexOfFirst { it.signal.id == selected.signal.id }
-    }?.takeIf { it >= 0 } ?: points.lastIndex
+    }?.takeIf { it >= 0 }
 
-    val markerPoint = points.getOrNull(markerIndex)
+    val markerPoint = markerIndex?.let { points.getOrNull(it) }
     if (markerPoint != null) {
-        mapView.overlays.add(
-            TrainPositionOverlay(
+        val angle = calculateScreenTrainAngle(mapView, points, markerIndex)
+        val overlay = mapView.trainPositionOverlay
+
+        if (overlay == null) {
+            val newOverlay = TrainPositionOverlay(
                 mapView,
                 markerPoint.geoPoint
             )
-        )
+            mapView.trainPositionOverlay = newOverlay
+            mapView.overlays.add(newOverlay)
+        } else {
+            overlay.updatePosition(
+                markerPoint.geoPoint,
+                angle
+            )
+        }
+    } else {
+        mapView.trainPositionOverlay?.let { oldOverlay ->
+            mapView.overlays.remove(oldOverlay)
+            mapView.trainPositionOverlay = null
+        }
     }
 
     mapView.invalidate()
 }
-
 private fun withOpacity(color: Int, opacity: Float): Int {
     val alpha = (AndroidColor.alpha(color) * opacity.coerceIn(0.0f, 1.0f)).toInt().coerceIn(0, 255)
     return AndroidColor.argb(
@@ -555,10 +596,38 @@ private fun withOpacity(color: Int, opacity: Float): Int {
         AndroidColor.blue(color)
     )
 }
+private fun calculateScreenTrainAngle(
+    mapView: MapView,
+    points: List<MapPoint>,
+    markerIndex: Int
+): Float {
+    if (points.size < 2) return 0f
+
+    val target = points[markerIndex].geoPoint
+    val neighbor = when {
+        markerIndex < points.lastIndex -> points[markerIndex + 1].geoPoint
+        markerIndex > 0 -> points[markerIndex - 1].geoPoint
+        else -> target
+    }
+
+    if (target == neighbor) return 0f
+
+    val a = mapView.projection.toPixels(target, Point())
+    val b = mapView.projection.toPixels(neighbor, Point())
+    val dx = (b.x - a.x).toFloat()
+    val dy = (b.y - a.y).toFloat()
+
+    if (dx == 0f && dy == 0f) return 0f
+
+    return (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f) % 360f
+}
+
 private class TrainPositionOverlay(
     private val mapView: MapView,
-    private val geoPoint: GeoPoint
+    private var geoPoint: GeoPoint
 ) : org.osmdroid.views.overlay.Overlay() {
+
+    private var angle: Float = 0f
 
     private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.argb(85, 33, 150, 243)
@@ -575,6 +644,11 @@ private class TrainPositionOverlay(
         style = Paint.Style.FILL
     }
 
+    fun updatePosition(newGeoPoint: GeoPoint, newAngle: Float) {
+        geoPoint = newGeoPoint
+        angle = newAngle
+    }
+
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
 
@@ -583,6 +657,8 @@ private class TrainPositionOverlay(
         val centerX = point.x.toFloat()
         val centerY = point.y.toFloat()
 
+        // 位置标记保持为无方向圆点；angle 仅保留给将来需要时的调试兼容，
+        // 不对圆点做旋转，因此切换公里标不会造成方向图标重建闪烁。
         canvas.drawCircle(centerX, centerY, 11f * density, haloPaint)
         canvas.drawCircle(centerX, centerY, 7f * density, ringPaint)
         canvas.drawCircle(centerX, centerY, 5f * density, centerPaint)
