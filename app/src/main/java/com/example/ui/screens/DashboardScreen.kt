@@ -69,7 +69,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -776,7 +775,6 @@ fun DashboardScreen(
                         color = PrimaryBlueDark,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
                         maxLines = 1,
                         softWrap = false
                     )
