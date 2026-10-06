@@ -12,6 +12,8 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.view.MotionEvent
 import android.view.ViewGroup
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +50,9 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.atan2
@@ -99,6 +104,22 @@ private class HistoryMapView(context: Context) : MapView(context) {
     var renderedMapMode: HistoryMapMode? = null
     var renderedRailwaySignature: String = ""
     var trainPositionOverlay: TrainPositionOverlay? = null
+    var railwayLabelOverlay: RailwayLabelOverlay? = null
+
+    private val railwayLabelRefreshHandler = Handler(Looper.getMainLooper())
+    private val railwayLabelRefreshRunnable = Runnable {
+        railwayLabelOverlay?.refreshLabels()
+        invalidate()
+    }
+
+    fun scheduleRailwayLabelRefresh() {
+        railwayLabelRefreshHandler.removeCallbacks(railwayLabelRefreshRunnable)
+        railwayLabelRefreshHandler.postDelayed(railwayLabelRefreshRunnable, 150L)
+    }
+
+    fun clearRailwayLabelRefresh() {
+        railwayLabelRefreshHandler.removeCallbacks(railwayLabelRefreshRunnable)
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
@@ -166,6 +187,19 @@ fun HistoryTrackMap(
     }
 
     DisposableEffect(lifecycleOwner, mapView) {
+        val mapListener = object : MapListener {
+            override fun onScroll(event: ScrollEvent?): Boolean {
+                mapView.scheduleRailwayLabelRefresh()
+                return true
+            }
+
+            override fun onZoom(event: ZoomEvent?): Boolean {
+                mapView.scheduleRailwayLabelRefresh()
+                return true
+            }
+        }
+        mapView.addMapListener(mapListener)
+
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> mapView.onResume()
@@ -178,6 +212,8 @@ fun HistoryTrackMap(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.removeMapListener(mapListener)
+            mapView.clearRailwayLabelRefresh()
             mapView.onPause()
             mapView.onDetach()
         }
@@ -272,6 +308,14 @@ private class RailwayLabelOverlay(
         textAlign = Paint.Align.CENTER
     }
 
+    private data class LineLabel(
+        val point: GeoPoint,
+        val angle: Float,
+        val name: String
+    )
+
+    private var lineLabels: List<LineLabel> = emptyList()
+
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
 
@@ -280,109 +324,193 @@ private class RailwayLabelOverlay(
         drawStations(canvas, zoom)
     }
 
-    private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
-        if (zoom < 8.0) return
+    /**
+     * 按 LBJ_Map/map.html 的 renderLineLabels() 重新计算标签锚点。
+     *
+     * 关键点：
+     * 1. 重新计算只发生在地图缩放/移动结束后的防抖刷新，而不是每一帧。
+     * 2. 标签锚点取“当前可见连续线路段的屏幕中点”。
+     * 3. 计算完成后锚点保存为 GeoPoint，所以用户拖动地图时，标签会跟着线路一起移动；
+     *    下一次移动结束后才重新取新的可见段中点。
+     */
+    fun refreshLabels() {
+        val zoom = mapView.zoomLevelDouble
+        if (zoom < 8.0) {
+            lineLabels = emptyList()
+            return
+        }
 
-        val density = mapView.resources.displayMetrics.density
-
-        // 保留 LBJ_Map 的字体、描边和碰撞显示风格，但标签位置不再取“当前视野线路段中点”。
-        // 每个标签使用线路自身固定的地理锚点，因此拖动地图时标签会随线路一起移动，
-        // 不会一直吸附在屏幕中央。
-        textPaint.textSize = 11f * density
-        textStrokePaint.textSize = textPaint.textSize
-        textStrokePaint.strokeWidth = 3.0f * density
-
-        val placedBoxes = ArrayList<RectF>()
+        val bounds = mapView.boundingBox
+        val labels = ArrayList<LineLabel>()
 
         data.lines.forEach lineLoop@ { line ->
             val lineName = line.name.trim()
 
-            // 与 LBJ_Map 一致：线路数字编号不是可视线路名称。
+            // 与 LBJ_Map 一致：线路数字编号不显示。
             if (lineName.isEmpty() || Regex("^线路\\d+$").matches(lineName)) return@lineLoop
 
             val points = line.points
             if (points.size < 2) return@lineLoop
 
-            val totalKm = polylineLengthKm(points)
-            if (totalKm <= 0.0) return@lineLoop
+            // 与 LBJ_Map 一致：只取当前视野内连续可见的线路段。
+            val visibleSegments = ArrayList<List<GeoPoint>>()
+            var currentSegment = ArrayList<GeoPoint>()
 
-            // 标签数量按线路长度确定，锚点始终固定在线路自身。
-            // 不再随着当前视野变化，所以平移地图时不会产生“字体追着视角走”的效果。
-            val labelCount = when {
-                totalKm < 8.0 -> 1
-                totalKm < 20.0 -> 2
-                totalKm < 50.0 -> 3
-                totalKm < 100.0 -> 4
-                else -> 6
-            }
-
-            val fractions = if (labelCount == 1) {
-                listOf(0.5)
-            } else {
-                (1..labelCount).map { index ->
-                    index.toDouble() / (labelCount + 1)
+            points.forEach { point ->
+                if (bounds.contains(point)) {
+                    currentSegment.add(point)
+                } else {
+                    if (currentSegment.size >= 2) {
+                        visibleSegments.add(currentSegment)
+                    }
+                    currentSegment = ArrayList()
                 }
             }
 
-            fractions.forEach fractionLoop@ { fraction ->
-                val sample = samplePolylineAtFraction(points, fraction)
-                    ?: return@fractionLoop
+            if (currentSegment.size >= 2) {
+                visibleSegments.add(currentSegment)
+            }
 
-                val anchor = mapView.projection.toPixels(sample.point, projectionPoint)
-                val before = mapView.projection.toPixels(sample.before, projectionPointA)
-                val after = mapView.projection.toPixels(sample.after, projectionPointB)
+            visibleSegments.forEach segmentLoop@ { segment ->
+                val pixelPoints = segment.map { point ->
+                    mapView.projection.toPixels(point, Point())
+                }
 
-                val dx = (after.x - before.x).toFloat()
-                val dy = (after.y - before.y).toFloat()
-                if (dx == 0f && dy == 0f) return@fractionLoop
+                var pixelLength = 0.0
+                for (i in 1 until pixelPoints.size) {
+                    val dx = (pixelPoints[i].x - pixelPoints[i - 1].x).toDouble()
+                    val dy = (pixelPoints[i].y - pixelPoints[i - 1].y).toDouble()
+                    pixelLength += Math.hypot(dx, dy)
+                }
+
+                // 与 LBJ_Map 一致：不足 80px 不放线路名。
+                if (pixelLength < 80.0) return@segmentLoop
+
+                val targetDistance = pixelLength / 2.0
+                var accumulated = 0.0
+                var midPoint = pixelPoints.first()
+                var directionA = pixelPoints.first()
+                var directionB = pixelPoints.getOrNull(1) ?: directionA
+
+                for (i in 1 until pixelPoints.size) {
+                    val p1 = pixelPoints[i - 1]
+                    val p2 = pixelPoints[i]
+                    val dx = (p2.x - p1.x).toDouble()
+                    val dy = (p2.y - p1.y).toDouble()
+                    val segmentDistance = Math.hypot(dx, dy)
+
+                    if (accumulated + segmentDistance >= targetDistance) {
+                        directionA = p1
+                        directionB = p2
+                        val ratio = if (segmentDistance > 0.0) {
+                            (targetDistance - accumulated) / segmentDistance
+                        } else {
+                            0.0
+                        }
+
+                        midPoint = Point(
+                            (p1.x + (p2.x - p1.x) * ratio).roundToInt(),
+                            (p1.y + (p2.y - p1.y) * ratio).roundToInt()
+                        )
+                        break
+                    }
+
+                    accumulated += segmentDistance
+                }
 
                 var angle = Math.toDegrees(
-                    atan2(dy.toDouble(), dx.toDouble())
+                    atan2(
+                        (directionB.y - directionA.y).toDouble(),
+                        (directionB.x - directionA.x).toDouble()
+                    )
                 ).toFloat()
 
-                // 与 LBJ_Map 一致：文字保持正向，不允许上下颠倒。
+                // 与 LBJ_Map 一致：文字保持正向。
                 if (angle > 90f) {
                     angle -= 180f
                 } else if (angle < -90f) {
                     angle += 180f
                 }
 
-                val x = anchor.x.toFloat()
-                val y = anchor.y.toFloat()
+                // 与 LBJ_Map 的 containerPointToLatLng(midPt) 等价：
+                // 将当前可见段的屏幕中点转换回地理坐标，作为本次标签的地理锚点。
+                val geoAnchor = mapView.projection.fromPixels(
+                    midPoint.x,
+                    midPoint.y,
+                    null
+                ) as GeoPoint
 
-                if (x !in -250f..(mapView.width + 250f) ||
-                    y !in -150f..(mapView.height + 150f)
-                ) {
-                    return@fractionLoop
-                }
-
-                val textWidth = (lineName.length * 12f + 8f) * density
-                val box = RectF(
-                    x - textWidth / 2f,
-                    y - 8f * density,
-                    x + textWidth / 2f,
-                    y + 8f * density
-                )
-
-                val overlap = placedBoxes.any { existing ->
-                    !(
-                        box.right < existing.left - 10f * density ||
-                            box.left > existing.right + 10f * density ||
-                            box.bottom < existing.top - 5f * density ||
-                            box.top > existing.bottom + 5f * density
+                labels.add(
+                    LineLabel(
+                        point = geoAnchor,
+                        angle = angle,
+                        name = lineName
                     )
-                }
-                if (overlap) return@fractionLoop
-
-                placedBoxes.add(box)
-
-                canvas.save()
-                canvas.rotate(angle, x, y)
-                val baseline = y - 4f * density
-                canvas.drawText(lineName, x, baseline, textStrokePaint)
-                canvas.drawText(lineName, x, baseline, textPaint)
-                canvas.restore()
+                )
             }
+        }
+
+        // 与 LBJ_Map 一致：按屏幕位置做简单碰撞过滤。
+        // 这里先按照刚刚计算出的地理锚点投影一次，再保存通过碰撞检测的标签。
+        val placedBoxes = ArrayList<RectF>()
+        val filtered = ArrayList<LineLabel>()
+        val density = mapView.resources.displayMetrics.density
+        textPaint.textSize = 11f * density
+        textStrokePaint.textSize = textPaint.textSize
+
+        labels.forEach { label ->
+            val anchor = mapView.projection.toPixels(label.point, projectionPoint)
+            val textWidth = textPaint.measureText(label.name) + 10f * density
+            val box = RectF(
+                anchor.x - textWidth / 2f,
+                anchor.y - 8f * density,
+                anchor.x + textWidth / 2f,
+                anchor.y + 8f * density
+            )
+
+            val overlap = placedBoxes.any { existing ->
+                !(
+                    box.right < existing.left - 10f * density ||
+                        box.left > existing.right + 10f * density ||
+                        box.bottom < existing.top - 5f * density ||
+                        box.top > existing.bottom + 5f * density
+                )
+            }
+
+            if (!overlap) {
+                placedBoxes.add(box)
+                filtered.add(label)
+            }
+        }
+
+        lineLabels = filtered
+    }
+
+    private fun drawRailwayNames(canvas: Canvas, zoom: Double) {
+        if (zoom < 8.0) return
+
+        val density = mapView.resources.displayMetrics.density
+        textPaint.textSize = 11f * density
+        textStrokePaint.textSize = textPaint.textSize
+        textStrokePaint.strokeWidth = 3.0f * density
+
+        lineLabels.forEach { label ->
+            val anchor = mapView.projection.toPixels(label.point, projectionPoint)
+            val x = anchor.x.toFloat()
+            val y = anchor.y.toFloat()
+
+            if (x !in -250f..(mapView.width + 250f) ||
+                y !in -150f..(mapView.height + 150f)
+            ) {
+                return@forEach
+            }
+
+            canvas.save()
+            canvas.rotate(label.angle, x, y)
+            val baseline = y - 4f * density
+            canvas.drawText(label.name, x, baseline, textStrokePaint)
+            canvas.drawText(label.name, x, baseline, textPaint)
+            canvas.restore()
         }
     }
 
@@ -442,68 +570,6 @@ private class RailwayLabelOverlay(
             }
         }
     }
-
-    private data class SampledSegment(
-        val point: GeoPoint,
-        val before: GeoPoint,
-        val after: GeoPoint
-    )
-
-    private fun samplePolylineAtFraction(
-        points: List<GeoPoint>,
-        fraction: Double
-    ): SampledSegment? {
-        if (points.size < 2) return null
-
-        val lengths = DoubleArray(points.size)
-        var totalMeters = 0.0
-        for (i in 1 until points.size) {
-            totalMeters += points[i - 1].distanceToAsDouble(points[i])
-            lengths[i] = totalMeters
-        }
-        if (totalMeters <= 0.0) return null
-
-        val target = totalMeters * fraction.coerceIn(0.0, 1.0)
-        for (i in 1 until points.size) {
-            if (target <= lengths[i]) {
-                val segmentStart = points[i - 1]
-                val segmentEnd = points[i]
-                val segmentMeters = lengths[i] - lengths[i - 1]
-                val ratio = if (segmentMeters > 0.0) {
-                    ((target - lengths[i - 1]) / segmentMeters).coerceIn(0.0, 1.0)
-                } else {
-                    0.0
-                }
-
-                val lat = segmentStart.latitude +
-                    (segmentEnd.latitude - segmentStart.latitude) * ratio
-                val lon = segmentStart.longitude +
-                    (segmentEnd.longitude - segmentStart.longitude) * ratio
-
-                return SampledSegment(
-                    point = GeoPoint(lat, lon),
-                    before = segmentStart,
-                    after = segmentEnd
-                )
-            }
-        }
-
-        return SampledSegment(
-            point = points.last(),
-            before = points[points.size - 2],
-            after = points.last()
-        )
-    }
-
-    private fun polylineLengthKm(points: List<GeoPoint>): Double {
-        if (points.size < 2) return 0.0
-
-        var totalMeters = 0.0
-        for (i in 1 until points.size) {
-            totalMeters += points[i - 1].distanceToAsDouble(points[i])
-        }
-        return totalMeters / 1000.0
-    }
 }
 
 private fun renderHistoryTrack(
@@ -540,6 +606,7 @@ private fun renderHistoryTrack(
         )
         mapView.overlays.clear()
         mapView.trainPositionOverlay = null
+        mapView.railwayLabelOverlay = null
 
         val mapLinePoints = if (mapMode == HistoryMapMode.SATELLITE) {
             railwayMapData?.lines?.flatMap { it.points }.orEmpty()
@@ -595,11 +662,15 @@ private fun renderHistoryTrack(
         }
 
         if (mapMode == HistoryMapMode.SATELLITE && railwayMapData?.hasFeatures == true) {
-            mapView.overlays.add(RailwayLabelOverlay(mapView, railwayMapData))
+            val labelOverlay = RailwayLabelOverlay(mapView, railwayMapData)
+            mapView.railwayLabelOverlay = labelOverlay
+            mapView.overlays.add(labelOverlay)
+            labelOverlay.refreshLabels()
         }
 
         mapView.renderedMapMode = mapMode
         mapView.renderedRailwaySignature = railwaySignature
+        mapView.railwayLabelOverlay?.refreshLabels()
     } else if (fitViewport && selectedPoint != null) {
         // 切换公里标时只移动视口，不重建底图与铁路图层。
         mapView.controller.setCenter(selectedPoint.geoPoint)
